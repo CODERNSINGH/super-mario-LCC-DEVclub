@@ -1,4 +1,5 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { dirname } from 'node:path'
 import { runShell, safePath } from './shell.js'
 
@@ -9,7 +10,8 @@ export const TOOL_DOCS = `Tools (reply with exactly ONE fenced json block per tu
 {"tool":"search","args":{"pattern":"regex","path":"optional/dir"}}   ripgrep-style search with line numbers
 {"tool":"read_file","args":{"path":"...","start":"1","end":"200"}}   read a numbered line range
 {"tool":"replace","args":{"path":"...","old":"...","new":"..."}}     replace ONE exact, unique occurrence
-{"tool":"write_file","args":{"path":"...","content":"..."}}          create or overwrite a file
+{"tool":"write_file","args":{"path":"...","content":"..."}}          create a NEW file (fails if it exists)
+{"tool":"revert","args":{"path":"..."}}                              undo all your changes to one file
 {"tool":"finish","args":{"summary":"..."}}                           only after tests pass and diff is reviewed`
 
 /** Models often cite paths as `src/a.js#L10`, `src/a.js:10` or `./src/a.js` — normalise to a real path. */
@@ -67,12 +69,18 @@ export async function execute(root: string, rawCall: ToolCall): Promise<string> 
       }
       case 'write_file': {
         const p = safePath(root, a.path)
+        if (existsSync(p)) return `ERROR: ${a.path} already exists. Do not overwrite it: use "replace" to edit part of it (or "revert" to undo your changes to it).`
         await mkdir(dirname(p), { recursive: true })
         await writeFile(p, a.content ?? '')
         return 'OK'
       }
+      case 'revert': {
+        safePath(root, a.path)
+        const r = await runShell(root, `git checkout -- ${q(a.path)}`, 20_000)
+        return r.code === 0 ? `OK: ${a.path} restored to its original content` : `ERROR: ${r.output}`
+      }
       default:
-        return `ERROR: unknown tool "${call.tool}". Use one of: bash, search, read_file, replace, write_file, finish.`
+        return `ERROR: unknown tool "${call.tool}". Use one of: bash, search, read_file, replace, write_file, revert, finish.`
     }
   } catch (e) {
     return `ERROR: ${(e as Error).message}`

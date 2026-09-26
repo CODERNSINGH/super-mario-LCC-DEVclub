@@ -14,6 +14,7 @@ WORKFLOW
 HARD RULES
 - Dependencies are already installed and a baseline test run is provided. Never run npm/yarn/pnpm install or add packages; never touch package.json or lockfiles.
 - Every reply MUST be a tool call. Do not write explanations without a tool call; put reasoning in one short sentence before the JSON.
+- Edit existing files ONLY with "replace" (small exact edits). write_file is for new files only. If a test suite fails after your edit, read the failure, and use "revert" if you broke a file.
 - Never delete, skip or weaken existing tests to make them pass. Never edit lockfiles, generated files or vendored code unless the issue requires it.
 - Never run interactive commands (editors, watch modes, prompts). Add flags such as -y, --no-pager, CI=1. Don't run git commit/push — Sakai handles that.
 - Don't install global packages. Install project dependencies only if tests cannot run otherwise.

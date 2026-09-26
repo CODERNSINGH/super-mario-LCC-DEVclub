@@ -36,6 +36,7 @@ function compact(messages: Message[]): Message[] {
 export async function runAgent(o: RunOptions): Promise<RunResult> {
   const testCmd = o.testCommand || (await detectTestCommand(o.root)) || 'unknown (find it in the repo)'
   const map = await repoMap(o.root)
+  const hasTests = !!(o.testCommand || (await detectTestCommand(o.root)))
 
   // Prepare the environment like an engineer would: install deps, then run the tests once to see what is failing.
   o.onEvent({ type: 'status', data: 'Preparing environment' })
@@ -115,7 +116,17 @@ export async function runAgent(o: RunOptions): Promise<RunResult> {
     if (isTestCmd(call, testCmd)) ranTests = true
     if (n >= 3) out += `\n[Sakai: you have repeated this exact call ${n} times with the same result. Do something different: read another file, edit, or run the tests.]`
     if (n >= 5) return { finished: false, summary: 'Stopped: the model is stuck repeating the same action. Try a stronger model or add guidance naming the file and the fix.', inputTokens: inT, outputTokens: outT, steps: step }
-    if (call.tool === 'replace' || call.tool === 'write_file') reviewed = false
+
+    // After any edit, run the tests for the model: instant feedback beats hoping it remembers to verify.
+    if (['replace', 'write_file', 'revert'].includes(call.tool) && out.startsWith('OK') && hasTests) {
+      reviewed = false
+      const t = await runShell(o.root, `CI=1 ${testCmd}`, 120_000)
+      ranTests = true
+      const tail = t.output.replace(/\u001b\[[0-9;]*m/g, '').slice(-1800)
+      out += t.code === 0
+        ? '\n\n[Sakai auto-ran the tests after your edit: ALL PASS. If the issue is fully resolved, call finish now with a short summary.]'
+        : `\n\n[Sakai auto-ran the tests after your edit: FAILING (exit ${t.code}). Fix the cause using this output:]\n${tail}`
+    }
     o.onEvent({ type: 'tool', data: { call, out } })
     messages.push({ role: 'user', content: out })
   }

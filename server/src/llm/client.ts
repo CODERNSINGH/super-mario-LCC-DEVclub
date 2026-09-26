@@ -16,7 +16,8 @@ export const NATIVE_TOOLS = [
   fn('search', 'Search the repository with a regex; returns file:line matches.', { pattern: str, path: { type: 'string', description: 'optional sub-directory' } }, ['pattern']),
   fn('read_file', 'Read a numbered line range of a file.', { path: str, start: str, end: str }, ['path']),
   fn('replace', 'Replace exactly one occurrence of old with new in a file.', { path: str, old: str, new: str }, ['path', 'old', 'new']),
-  fn('write_file', 'Create or overwrite a file.', { path: str, content: str }, ['path', 'content']),
+  fn('write_file', 'Create a NEW file (fails if it already exists).', { path: str, content: str }, ['path', 'content']),
+  fn('revert', 'Undo all your changes to one file.', { path: str }, ['path']),
   fn('finish', 'Finish after tests pass and the diff is reviewed.', { summary: str }, ['summary']),
 ]
 
