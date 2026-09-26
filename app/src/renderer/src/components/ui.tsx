@@ -1,19 +1,20 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import logo from '../assets/logo.png'
 
-export function Logo({ size = 28 }: { size?: number }) {
+export function Logo({ size = 28, text = true }: { size?: number; text?: boolean }) {
   return (
     <div className="flex items-center gap-2.5">
-      {/* Transparent PNG (black backdrop converted to alpha) so it sits cleanly on the dark UI. */}
       <img src={logo} width={size} height={size} alt="" className="select-none" draggable={false} />
-      <span className="text-ink text-[15px] font-semibold tracking-wide">Sakai</span>
+      {text && <span className="text-ink text-[15px] font-semibold tracking-wide">Sakai</span>}
     </div>
   )
 }
 
-export function Button({ variant = 'primary', className = '', ...p }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'ghost' }) {
-  const base = 'h-9 px-4 rounded-md text-[13px] font-medium transition-colors disabled:opacity-40 disabled:pointer-events-none no-drag'
-  const v = variant === 'primary' ? 'bg-sakai hover:bg-sakai-hover text-ink' : 'border border-line bg-raised hover:border-[#2c2c32] text-fg'
+export function Button({ variant = 'primary', className = '', ...p }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'ghost' | 'quiet' }) {
+  const base = 'h-9 px-4 rounded-md text-[13px] font-medium transition-all disabled:opacity-40 disabled:pointer-events-none no-drag active:scale-[.98]'
+  const v = variant === 'primary' ? 'bg-sakai hover:bg-sakai-hover text-ink shadow-[0_0_0_1px_rgba(255,255,255,.06)_inset]'
+    : variant === 'ghost' ? 'border border-line2 bg-raised hover:border-faint text-fg'
+    : 'text-muted hover:text-ink hover:bg-hover'
   return <button className={`${base} ${v} ${className}`} {...p} />
 }
 
@@ -21,10 +22,6 @@ export function Card({ children, className = '' }: { children: ReactNode; classN
   return <div className={`bg-panel border border-line rounded-lg ${className}`}>{children}</div>
 }
 
-export function Steps({ current }: { current: number }) {
-  return (
-    <div className="flex gap-1.5 mb-6">
-      {[0, 1, 2].map((i) => <div key={i} className={`h-0.5 flex-1 rounded ${i <= current ? 'bg-sakai' : 'bg-line'}`} />)}
-    </div>
-  )
+export function Kbd({ children }: { children: ReactNode }) {
+  return <span className="kbd">{children}</span>
 }

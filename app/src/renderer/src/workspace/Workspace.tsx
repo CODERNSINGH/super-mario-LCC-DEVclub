@@ -1,159 +1,139 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useApp } from '../store'
-import { useSession, type Side } from '../lib/session'
-import { Explorer } from '../components/Explorer'
-import { FileView, DiffView } from '../components/Editors'
-import { Terminal } from '../components/Terminal'
-import { TaskPanel } from './TaskPanel'
-import { CommandPalette } from './CommandPalette'
-import { QuickPane, SettingsPane } from './SidePanes'
+import { useSession } from '../lib/session'
+import { post, cleanErr } from '../lib/api'
 import { pushRecent } from '../lib/recent'
-import { post } from '../lib/api'
-import { useRef } from 'react'
-
-import { cleanErr } from '../lib/api'
-
-const ACTIVITY: { id: Side; label: string; icon: string }[] = [
-  { id: 'issues', label: 'Issues', icon: '◎' },
-  { id: 'explorer', label: 'Explorer', icon: '▤' },
-  { id: 'changes', label: 'Changes', icon: '±' },
-  { id: 'quick', label: 'Quick commands', icon: '›_' },
-  { id: 'settings', label: 'Settings', icon: '⚙' },
-]
+import * as A from '../lib/actions'
+import { TitleBar } from './TitleBar'
+import { ActivityBar } from './ActivityBar'
+import { ExplorerPane, SearchPane, ScmPane, IssuesPane, QuickPane } from './SidePanes'
+import { EditorArea } from './EditorArea'
+import { Panel } from './Panel'
+import { StatusBar } from './StatusBar'
+import { AgentPanel } from './agent/AgentPanel'
+import { CommandPalette } from './CommandPalette'
+import { Splitter } from './Splitter'
 
 export function Workspace() {
-  const { repo, user, llm, localPath, set } = useApp()
+  const { repo, localPath, mode, set } = useApp()
   const s = useSession()
-  const logEnd = useRef<HTMLDivElement>(null)
-  const started = useRef(false)
+  const booted = useRef('')
+  const [nonce, setNonce] = useState(0)
 
-  const [failed, setFailed] = useState(false)
+  const openReadme = useCallback(async (root: string) => {
+    const nodes = await post<{ name: string; path: string; dir: boolean }[]>('/fs/list', { root, path: '' }).catch(() => [])
+    const f = nodes.find((n) => !n.dir && /^readme/i.test(n.name)) ?? nodes.find((n) => !n.dir)
+    if (f) A.openFile(f.path)
+  }, [])
 
-  const load = useCallback(async () => {
+  // Boot: GitHub mode clones (or reuses) the repo; local mode opens the folder as-is.
+  useEffect(() => {
+    const key = mode === 'github' ? `g:${repo}` : `l:${localPath}`
+    if (booted.current === key || (mode === 'github' && !repo) || (mode === 'local' && !localPath)) return
+    booted.current = key
     const st = useSession.getState()
-    setFailed(false)
-    try {
-      const path = await window.sakai.repo.clone(repo!)
-      set({ localPath: path })
-      st.log(`✓ Ready at ${path}`)
-      st.log('$ gh issue list --state open')
-      const list = await window.sakai.github.issues(repo!)
-      st.set({ issues: list })
-      st.log(`✓ ${list.length} open issue(s) found. Pick one, or describe your own task.`)
-    } catch (e) {
-      st.log(`✗ ${cleanErr(e)}`)
-      st.log('→ Fix it in the Terminal tab (⌘`) — you can run git commands yourself — then press "Retry clone".')
-      setFailed(true)
-    }
-  }, [repo, set])
+    const off = window.sakai.repo.onLog((l) => useSession.getState().log(l))
+    void (async () => {
+      try {
+        let root = localPath
+        if (mode === 'github') {
+          pushRecent({ kind: 'github', value: repo! })
+          root = await window.sakai.repo.clone(repo!)
+          set({ localPath: root })
+          st.log(`✓ Ready at ${root}`)
+          st.log('$ gh issue list --state open')
+          const list = await window.sakai.github.issues(repo!)
+          st.set({ issues: list, side: 'explorer' })
+          st.log(`✓ ${list.length} open issue(s) found.`)
+        } else {
+          st.log(`✓ Opened ${localPath}`)
+        }
+        st.set({ ready: true })
+        await openReadme(root!)
+      } catch (e) {
+        st.log(`✗ ${cleanErr(e)}`)
+        st.log('→ Fix it in the Terminal tab — you can run git commands yourself — then press Retry.')
+        st.set({ cloneFailed: true, panel: 'output', panelOpen: true })
+      }
+    })()
+    return () => { off() }
+  }, [mode, repo, localPath, set, openReadme, nonce])
 
   useEffect(() => {
-    pushRecent(repo!)
-    const off = window.sakai.repo.onLog((l) => useSession.getState().log(l))
-    if (!started.current) { started.current = true; void load() }
-    return off
-  }, [repo, load])
+    const h = () => { booted.current = ''; useSession.getState().set({ cloneFailed: false }); useSession.getState().log('$ retry'); setNonce((n) => n + 1) }
+    window.addEventListener('sakai:retry', h)
+    return () => window.removeEventListener('sakai:retry', h)
+  }, [])
 
-  useEffect(() => { logEnd.current?.scrollIntoView() }, [s.logs.length])
+  // Keep the changed-files badge fresh.
+  useEffect(() => {
+    if (!localPath || !s.ready) return
+    const tick = () => void post<{ files: string[] }>('/git/changes', { root: localPath }).then(({ files }) => { const cur = useSession.getState().changed; if (files.join('|') !== cur.join('|')) useSession.getState().set({ changed: files }) }).catch(() => undefined)
+    tick(); const id = setInterval(tick, 4000)
+    return () => clearInterval(id)
+  }, [localPath, s.ready])
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); useSession.getState().set({ palette: true }) }
-      if ((e.metaKey || e.ctrlKey) && e.key === '`') { e.preventDefault(); useSession.getState().set({ panel: 'terminal', panelOpen: true }) }
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') { e.preventDefault(); const p = useSession.getState(); p.set({ panelOpen: !p.panelOpen }) }
+      const m = e.metaKey || e.ctrlKey, k = e.key.toLowerCase()
+      if (!m) return
+      const go = (fn: () => void) => { e.preventDefault(); fn() }
+      if (k === 'p' && e.shiftKey) go(() => A.openPalette('commands'))
+      else if (k === 'p') go(() => A.openPalette('files'))
+      else if (k === 'b' && e.altKey) go(A.toggleAgent)
+      else if (k === 'b') go(A.toggleSidebar)
+      else if (k === 'j') go(A.togglePanel)
+      else if (e.key === '`') go(() => (useSession.getState().panelOpen && useSession.getState().panel === 'terminal' ? A.togglePanel() : A.openTerminal()))
+      else if (k === 'e' && e.shiftKey) go(() => A.showSide('explorer'))
+      else if (k === 'f' && e.shiftKey) go(() => A.showSide('search'))
+      else if (k === 'g' && e.shiftKey) go(() => A.showSide('scm'))
+      else if (k === 'w') go(() => { const st = useSession.getState(); st.closeTab(st.active) })
+      else if (k === ',') go(A.openSettings)
+      else if (k === 'n') go(A.newTask)
+      else if (k === 'o') go(() => void A.pickAndOpenFolder())
+      else if (k === 'r' && e.shiftKey) go(A.newTask)
     }
     window.addEventListener('keydown', h)
     return () => window.removeEventListener('keydown', h)
   }, [])
 
-  async function refreshChanges() {
-    if (!localPath) return
-    const { files } = await post<{ files: string[] }>('/git/changes', { root: localPath }).catch(() => ({ files: [] as string[] }))
-    s.set({ changed: files })
-  }
-  useEffect(() => { if (s.side === 'changes') void refreshChanges() }, [s.side]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const tabBtn = (active: boolean) => `h-full px-3 flex items-center gap-2 border-r border-line text-[12.5px] ${active ? 'bg-bg text-ink border-t-2 border-t-sakai' : 'bg-panel text-muted hover:text-fg'}`
-  const activeTab = s.tabs.find((t) => t.id === s.active)!
-
+  const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v))
+  // Keep at least ~400px for the editor: side panes shrink on narrow windows without losing the saved size.
+  const [vw, setVw] = useState(window.innerWidth)
+  useEffect(() => { const h = () => setVw(window.innerWidth); window.addEventListener('resize', h); return () => window.removeEventListener('resize', h) }, [])
+  const room = vw - 48 - 400
+  const sideEff = s.sideOpen ? clamp(s.sideW, 180, Math.max(180, room - (s.agentOpen ? 300 : 0))) : 0
+  const agentEff = s.agentOpen ? clamp(s.agentW, 300, Math.max(300, room - sideEff)) : 0
   return (
     <div className="h-full flex flex-col bg-bg">
-      <div className="drag h-9 shrink-0 border-b border-line bg-panel flex items-center justify-center text-xs text-muted">
-        Sakai — {repo}
-        <button onClick={() => s.set({ palette: true })} className="no-drag absolute right-3 h-6 px-2 rounded border border-line text-[11px] hover:border-[#2c2c32]">⌘K</button>
-      </div>
+      <TitleBar />
       <div className="flex-1 flex min-h-0">
-        <nav className="w-12 shrink-0 border-r border-line bg-panel flex flex-col items-center py-1">
-          {ACTIVITY.map((a) => (
-            <button key={a.id} title={a.label} onClick={() => s.set({ side: a.id })} className={`w-12 h-11 grid place-items-center text-lg ${s.side === a.id ? 'text-ink border-l-2 border-sakai' : 'text-muted border-l-2 border-transparent hover:text-fg'}`}>{a.icon}</button>
-          ))}
-          <div className="flex-1" />
-        </nav>
-
-        <aside className="w-72 shrink-0 border-r border-line bg-panel flex flex-col min-h-0">
-          <div className="px-4 h-9 shrink-0 flex items-center text-[11px] uppercase tracking-wider text-muted">{ACTIVITY.find((a) => a.id === s.side)!.label}</div>
-          <div className="flex-1 overflow-auto pb-3">
-            {s.side === 'issues' && (
-              <>
-                <button onClick={() => { s.set({ picked: null, goal: '', branch: `sakai/task-${Date.now().toString(36)}`, estimate: null }); s.openTab({ id: 'task', kind: 'task', title: 'Task' }); s.set({ active: 'task' }) }} className="w-full text-left px-4 h-8 text-sakai hover:bg-raised">+ Describe your own task</button>
-                {s.issues.map((i) => (
-                  <button key={i.number} onClick={() => { s.set({ picked: i, active: 'task' }) }} className={`w-full text-left px-4 py-2 border-l-2 ${s.picked?.number === i.number ? 'border-sakai bg-raised text-ink' : 'border-transparent hover:bg-raised'}`}>
-                    <span className="text-muted">#{i.number}</span> {i.title}
-                    {i.labels.length > 0 && <div className="mt-1 flex gap-1 flex-wrap">{i.labels.slice(0, 3).map((l) => <span key={l} className="text-[10px] px-1.5 rounded border border-line text-muted">{l}</span>)}</div>}
-                  </button>
-                ))}
-                {!s.issues.length && <p className="px-4 py-2 text-muted text-xs">{localPath ? 'No open issues.' : failed ? 'Clone failed — see logs below.' : 'Cloning repository…'}</p>}
-              </>
-            )}
-            {s.side === 'explorer' && <Explorer />}
-            {s.side === 'quick' && <QuickPane />}
-            {s.side === 'settings' && <SettingsPane />}
-            {s.side === 'changes' && (
-              <>
-                {s.changed.map((f) => <button key={f} onClick={() => s.openTab({ id: `diff:${f}`, kind: 'diff', title: `${f.split('/').pop()} (diff)`, path: f })} className="w-full text-left px-4 h-7 font-mono text-[12px] hover:bg-raised truncate">{f}</button>)}
-                {!s.changed.length && <p className="px-4 py-2 text-muted text-xs">Working tree clean.</p>}
-              </>
-            )}
-          </div>
-        </aside>
-
-        <section className="flex-1 min-w-0 flex flex-col">
-          <div className="h-9 shrink-0 flex border-b border-line bg-panel overflow-x-auto">
-            {s.tabs.map((t) => (
-              <div key={t.id} className={tabBtn(t.id === s.active)}>
-                <button onClick={() => s.set({ active: t.id })}>{t.title}{s.dirty[t.id] ? ' ●' : ''}</button>
-                {t.id !== 'task' && <button onClick={() => s.closeTab(t.id)} className="text-muted hover:text-ink">×</button>}
-              </div>
-            ))}
-          </div>
-          <div className="flex-1 min-h-0">
-            {activeTab.kind === 'task' && <TaskPanel />}
-            {activeTab.kind === 'file' && <FileView key={activeTab.id} path={activeTab.path!} />}
-            {activeTab.kind === 'diff' && <DiffView key={activeTab.id} path={activeTab.path!} />}
-          </div>
-          {s.panelOpen && (
-            <div className="h-56 shrink-0 border-t border-line bg-panel flex flex-col">
-              <div className="h-8 px-2 flex items-center gap-1 text-[11px] uppercase tracking-wider border-b border-line shrink-0">
-                {(['logs', 'terminal'] as const).map((p) => <button key={p} onClick={() => s.set({ panel: p })} className={`px-2 h-full ${s.panel === p ? 'text-ink border-b border-sakai' : 'text-muted hover:text-fg'}`}>{p}</button>)}
-                {failed && <button onClick={() => { s.log('$ retry clone'); void load() }} className="ml-auto px-2 h-6 rounded bg-sakai text-ink normal-case tracking-normal">Retry clone</button>}
-                <button onClick={() => s.set({ panelOpen: false })} className={`${failed ? '' : 'ml-auto'} px-2 text-muted hover:text-ink`}>×</button>
-              </div>
-              <div className="flex-1 min-h-0 relative">
-                <div className={`absolute inset-0 overflow-auto px-4 py-2 font-mono text-[12px] ${s.panel === 'logs' ? '' : 'invisible'}`}>
-                  {s.logs.map((l, i) => <div key={i} className={`whitespace-pre-wrap ${l.startsWith('✗') ? 'text-sakai' : l.startsWith('$') ? 'text-ink' : ''}`}>{l}</div>)}
-                  <div ref={logEnd} />
-                </div>
-                <div className={`absolute inset-0 ${s.panel === 'terminal' ? '' : 'invisible'}`}><Terminal cwd={localPath} visible={s.panel === 'terminal'} /></div>
-              </div>
-            </div>
-          )}
-        </section>
+        <ActivityBar />
+        {s.sideOpen && (
+          <>
+            <aside className="shrink-0 bg-panel border-r border-line min-h-0" style={{ width: sideEff }}>
+              {s.side === 'explorer' && <ExplorerPane />}
+              {s.side === 'search' && <SearchPane />}
+              {s.side === 'scm' && <ScmPane />}
+              {s.side === 'issues' && <IssuesPane />}
+              {s.side === 'quick' && <QuickPane />}
+            </aside>
+            <Splitter dir="v" onDrag={(d) => s.setSize({ sideW: clamp(useSession.getState().sideW + d, 180, 560) })} />
+          </>
+        )}
+        <div className="flex-1 min-w-0 flex flex-col min-h-0">
+          {!(s.panelOpen && s.panelMax) && <EditorArea />}
+          {s.panelOpen && !s.panelMax && <Splitter dir="h" onDrag={(d) => s.setSize({ panelH: clamp(useSession.getState().panelH - d, 100, 620) })} />}
+          <div className={s.panelMax ? 'flex-1 min-h-0' : 'shrink-0'} style={{ height: s.panelMax ? undefined : s.panelH, display: s.panelOpen ? 'block' : 'none' }}><Panel /></div>
+        </div>
+        {s.agentOpen && (
+          <>
+            <Splitter dir="v" onDrag={(d) => s.setSize({ agentW: clamp(useSession.getState().agentW - d, 300, 680) })} />
+            <div className="shrink-0 min-h-0" style={{ width: agentEff }}><AgentPanel /></div>
+          </>
+        )}
       </div>
-      <footer className="h-6 shrink-0 bg-sakai text-ink text-[11px] flex items-center px-3 gap-4">
-        <span>⎇ {s.branch || (localPath ? 'main' : 'cloning…')}</span><span>{user?.login}</span>
-        {s.phase === 'running' && <span>● running · {s.usage.steps} steps</span>}
-        <span className="ml-auto">{llm?.provider} · {llm?.model}</span>
-      </footer>
+      <StatusBar />
       {s.palette && <CommandPalette />}
     </div>
   )

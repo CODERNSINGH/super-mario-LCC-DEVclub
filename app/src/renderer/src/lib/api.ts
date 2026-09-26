@@ -3,8 +3,14 @@ import { useApp } from '../store'
 let base = ''
 async function url() { return base || (base = await window.sakai.serverUrl()) }
 
-export async function post<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${await url()}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+/** Session endpoints can be pointed at a dev stub via localStorage['sakai.server'] (dev builds only). */
+export async function sessionUrl(): Promise<string> {
+  try { const o = import.meta.env.DEV ? localStorage.getItem('sakai.server') : null; if (o) return o } catch { /* ignore */ }
+  return url()
+}
+
+export async function post<T>(path: string, body: unknown, session = false): Promise<T> {
+  const res = await fetch(`${session ? await sessionUrl() : await url()}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
   const data = await res.json()
   if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`)
   return data as T

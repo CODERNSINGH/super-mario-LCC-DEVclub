@@ -34,3 +34,12 @@ export const langFor = (path: string): string => {
   const ext = path.split('.').pop()?.toLowerCase() ?? ''
   return ({ ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript', mjs: 'javascript', json: 'json', py: 'python', go: 'go', rs: 'rust', java: 'java', md: 'markdown', css: 'css', html: 'html', yml: 'yaml', yaml: 'yaml', sh: 'shell', rb: 'ruby', php: 'php', c: 'c', cpp: 'cpp', cs: 'csharp', kt: 'kotlin', swift: 'swift' } as Record<string, string>)[ext] ?? 'plaintext'
 }
+
+// Shared handle to the focused editor so menus/search/outline can drive it.
+import type { editor } from 'monaco-editor'
+export const editorRef: { current: editor.IStandaloneCodeEditor | null; pending: { path: string; line: number } | null } = { current: null, pending: null }
+export function revealLine(path: string, line: number) {
+  editorRef.pending = { path, line }
+  editorRef.current?.revealLineInCenter(line)
+}
+export function runEditorAction(id: string) { editorRef.current?.focus(); void editorRef.current?.getAction(id)?.run() }

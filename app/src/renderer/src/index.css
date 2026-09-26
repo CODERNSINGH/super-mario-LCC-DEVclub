@@ -6,23 +6,60 @@
   --color-ink: #ffffff;
   --color-fg: #d8d8da;
   --color-muted: #8a8a90;
+  --color-faint: #5c5c63;
   --color-bg: #0b0b0c;
+  --color-title: #0e0e10;
   --color-panel: #111113;
   --color-raised: #17171a;
+  --color-hover: #1a1a1e;
   --color-line: #1f1f23;
+  --color-line2: #2a2a30;
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif;
   --font-mono: "SF Mono", "JetBrains Mono", Menlo, monospace;
 }
 
 html, body, #root { height: 100%; }
-body { background: var(--color-bg); color: var(--color-fg); font-family: var(--font-sans); font-size: 13px; -webkit-font-smoothing: antialiased; overflow: hidden; }
+body { background: var(--color-bg); color: var(--color-fg); font-family: var(--font-sans); font-size: 13px; -webkit-font-smoothing: antialiased; overflow: hidden; user-select: none; }
+input, textarea, pre, .selectable { user-select: text; }
+button { cursor: default; font: inherit; color: inherit; }
 .drag { -webkit-app-region: drag; }
 .no-drag { -webkit-app-region: no-drag; }
 ::selection { background: color-mix(in srgb, var(--color-sakai) 45%, transparent); }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: #26262b; border: 2px solid var(--color-bg); border-radius: 6px; }
+::-webkit-scrollbar-thumb { background: #26262b; border: 2px solid transparent; background-clip: content-box; border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: #34343b; background-clip: content-box; border: 2px solid transparent; }
+::-webkit-scrollbar-corner { background: transparent; }
+:focus-visible { outline: 1px solid var(--color-sakai); outline-offset: -1px; }
+input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; }
 
+/* Motion */
 @keyframes pop { from { opacity: 0; transform: scale(.86); } to { opacity: 1; transform: scale(1); } }
-.pop { animation: pop .55s cubic-bezier(.16,1,.3,1) both; }
-@keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-.fade { animation: fade .35s ease both; }
+.pop { animation: pop .6s cubic-bezier(.16,1,.3,1) both; }
+@keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.fade { animation: fade .38s cubic-bezier(.16,1,.3,1) both; }
+@keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+.fadein { animation: fadein .2s ease both; }
+@keyframes glow { 0%,100% { opacity: .55; transform: scale(1); } 50% { opacity: .85; transform: scale(1.06); } }
+.glow { animation: glow 6s ease-in-out infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin .9s linear infinite; }
+@keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+.float { animation: float 5s ease-in-out infinite; }
+@keyframes shimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+.shimmer { background: linear-gradient(90deg, transparent 0, rgba(188,0,45,.35) 50%, transparent 100%); background-size: 200% 100%; animation: shimmer 1.6s linear infinite; }
+
+/* Onboarding backdrop: fine dotted grid + red aura */
+.grid-bg { background-image: radial-gradient(#1c1c20 1px, transparent 1px); background-size: 22px 22px; }
+
+/* VS Code-like list rows */
+.row { display: flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px; white-space: nowrap; overflow: hidden; }
+.row:hover { background: var(--color-hover); }
+.row.active { background: color-mix(in srgb, var(--color-sakai) 20%, transparent); color: var(--color-ink); }
+
+/* Splitters */
+.split-v { width: 4px; margin: 0 -2px; z-index: 20; cursor: col-resize; position: relative; flex: none; }
+.split-h { height: 4px; margin: -2px 0; z-index: 20; cursor: row-resize; position: relative; flex: none; }
+.split-v:hover, .split-h:hover, .split-v.dragging, .split-h.dragging { background: var(--color-sakai); transition: background .15s .1s; }
+
+.kbd { font-family: var(--font-mono); font-size: 11px; color: var(--color-muted); }
+.xterm .xterm-viewport { background-color: transparent !important; }

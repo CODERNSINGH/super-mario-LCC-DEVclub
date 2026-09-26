@@ -1,28 +1,53 @@
 import { useEffect, useRef, useState } from 'react'
 import Editor, { DiffEditor } from '@monaco-editor/react'
 import '../lib/monaco'
-import { langFor } from '../lib/monaco'
+import { editorRef, langFor } from '../lib/monaco'
 import { post } from '../lib/api'
 import { useApp } from '../store'
 import { useSession } from '../lib/session'
+import { invalidateFiles } from '../lib/files'
 
-const opts = { fontSize: 13, fontFamily: '"SF Mono", Menlo, monospace', minimap: { enabled: false }, scrollBeyondLastLine: false, automaticLayout: true, padding: { top: 10 } }
+const opts = {
+  fontSize: 13, fontFamily: '"SF Mono", Menlo, monospace', fontLigatures: false,
+  minimap: { enabled: true, renderCharacters: false, scale: 1 }, scrollBeyondLastLine: false, automaticLayout: true,
+  padding: { top: 8 }, renderLineHighlight: 'all' as const, smoothScrolling: true, cursorBlinking: 'smooth' as const, bracketPairColorization: { enabled: true },
+  guides: { indentation: true }, stickyScroll: { enabled: false },
+}
 
 export function FileView({ path }: { path: string }) {
   const root = useApp((s) => s.localPath)!
   const [content, setContent] = useState<string | null>(null)
-  const latest = useRef('')
-  useEffect(() => { void post<{ content: string }>('/fs/read', { root, path }).then((r) => setContent(r.content)).catch((e) => setContent(`// ${e.message}`)) }, [root, path])
-  if (content === null) return <div className="p-6 text-muted">Loading…</div>
+  const ed = useRef<Parameters<NonNullable<React.ComponentProps<typeof Editor>['onMount']>>[0] | null>(null)
   const id = `file:${path}`
+
+  useEffect(() => { void post<{ content: string }>('/fs/read', { root, path }).then((r) => setContent(r.content)).catch((e) => setContent(`// ${e.message}`)) }, [root, path])
+
+  const save = async () => {
+    if (!ed.current) return
+    await post('/fs/write', { root, path, content: ed.current.getValue() })
+    invalidateFiles(root)
+    const st = useSession.getState(); st.set({ dirty: { ...st.dirty, [id]: false } }); st.log(`✓ Saved ${path}`)
+  }
+  useEffect(() => {
+    const h = () => { if (useSession.getState().active === id) void save() }
+    window.addEventListener('sakai:save', h)
+    return () => window.removeEventListener('sakai:save', h)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, root, path])
+
+  if (content === null) return <div className="p-6 text-muted">Loading…</div>
   return (
     <Editor
-      theme="sakai" path={path} language={langFor(path)} value={content} options={{ ...opts, readOnly: false }}
-      onChange={(v) => { latest.current = v ?? ''; const st = useSession.getState(); if (!st.dirty[id]) st.set({ dirty: { ...st.dirty, [id]: true } }) }}
-      onMount={(ed, m) => ed.addCommand(m.KeyMod.CtrlCmd | m.KeyCode.KeyS, async () => {
-        await post('/fs/write', { root, path, content: ed.getValue() })
-        const st = useSession.getState(); st.set({ dirty: { ...st.dirty, [id]: false } }); st.log(`✓ Saved ${path}`)
-      })}
+      theme="sakai" path={path} language={langFor(path)} defaultValue={content} options={opts}
+      onChange={() => { const st = useSession.getState(); if (!st.dirty[id]) st.set({ dirty: { ...st.dirty, [id]: true } }) }}
+      onMount={(e, m) => {
+        ed.current = e; editorRef.current = e
+        e.addCommand(m.KeyMod.CtrlCmd | m.KeyCode.KeyS, () => void save())
+        e.onDidChangeCursorPosition((c) => useSession.getState().set({ cursor: { line: c.position.lineNumber, col: c.position.column } }))
+        e.onDidFocusEditorText(() => { editorRef.current = e })
+        if (editorRef.pending?.path === path) { e.revealLineInCenter(editorRef.pending.line); e.setPosition({ lineNumber: editorRef.pending.line, column: 1 }); editorRef.pending = null }
+        e.focus()
+      }}
     />
   )
 }
@@ -34,5 +59,5 @@ export function DiffView({ path }: { path: string }) {
     void Promise.all([post<{ content: string }>('/git/original', { root, path }), post<{ content: string }>('/fs/read', { root, path }).catch(() => ({ content: '' }))]).then(([a, b]) => setPair([a.content, b.content]))
   }, [root, path])
   if (!pair) return <div className="p-6 text-muted">Loading diff…</div>
-  return <DiffEditor theme="sakai" language={langFor(path)} original={pair[0]} modified={pair[1]} options={{ ...opts, readOnly: true, renderSideBySide: true }} />
+  return <DiffEditor theme="sakai" language={langFor(path)} original={pair[0]} modified={pair[1]} keepCurrentOriginalModel keepCurrentModifiedModel options={{ ...opts, readOnly: true, renderSideBySide: true, minimap: { enabled: false } }} />
 }
