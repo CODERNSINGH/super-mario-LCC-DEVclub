@@ -26,7 +26,8 @@ export async function readRepoFile(root: string, rel: string): Promise<string> {
 /** Tracked files with sizes (uses git so ignored files are skipped). */
 export async function trackedFiles(root: string): Promise<{ path: string; size: number }[]> {
   const r = await runShell(root, 'git ls-files', 20_000)
-  const files = r.output.split('\n').filter(Boolean)
+  let files = r.code === 0 ? r.output.split('\n').filter(Boolean) : []
+  if (!files.length) files = await walk(root) // not a git repo (local test folder)
   const out: { path: string; size: number }[] = []
   for (const f of files) {
     if (!CODE_EXT.has(extname(f).toLowerCase())) continue
@@ -74,4 +75,16 @@ export async function installDeps(root: string): Promise<string | null> {
     return `$ ${cmd}\nexit ${r.code}\n${r.output.slice(-600)}`
   }
   return null
+}
+
+/** Directory walk used when a folder is not (yet) a git repository. */
+async function walk(root: string, rel = '', out: string[] = []): Promise<string[]> {
+  if (out.length > 3000) return out
+  for (const e of await readdir(join(root, rel), { withFileTypes: true }).catch(() => [])) {
+    if (SKIP.has(e.name) || e.name.startsWith('.sakai-')) continue
+    const p = rel ? `${rel}/${e.name}` : e.name
+    if (e.isDirectory()) await walk(root, p, out)
+    else out.push(p)
+  }
+  return out
 }

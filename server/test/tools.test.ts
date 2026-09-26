@@ -59,3 +59,43 @@ test('bash guard blocks dependency and git changes', async () => {
   assert.equal(blockedCommand('npm test'), null)
   assert.equal(blockedCommand('git diff'), null)
 })
+
+test('applyReplace: exact, whitespace-insensitive multi-line, and helpful failures', async () => {
+  const { applyReplace } = await import('../src/tools/index.js')
+  const src = 'function multiply(a, b) {\n  const numA = a || 1;\n  const numB = b || 1;\n  return numA * numB;\n}\n'
+  const exact = applyReplace(src, 'return numA * numB;', 'return a * b;')
+  assert.ok(exact.ok && !exact.fuzzy && exact.result.includes('return a * b;'))
+  // two statements joined on one line (what qwen2.5:7b produced) still matches the two source lines
+  const joined = applyReplace(src, 'const numA = a || 1; const numB = b || 1;', 'if (a === 0 || b === 0) return 0;\nconst numA = a;\nconst numB = b;')
+  assert.ok(joined.ok && joined.fuzzy)
+  if (joined.ok) assert.equal(joined.result, 'function multiply(a, b) {\n  if (a === 0 || b === 0) return 0;\n  const numA = a;\n  const numB = b;\n  return numA * numB;\n}\n')
+  const missing = applyReplace(src, 'const numA = a || 2;', 'x')
+  assert.ok(!missing.ok && /numA/.test((missing as { error: string }).error))
+  assert.ok(!applyReplace(src, 'return numA * numB;', 'return numA * numB;').ok)
+  assert.ok(!applyReplace('a\na\n', 'a', 'b').ok)
+})
+
+test('replace_lines replaces an inclusive line range and validates bounds', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'sakai-rl-'))
+  writeFileSync(join(root, 'f.js'), 'a\nb\nc\nd\n')
+  const out = await execute(root, { tool: 'replace_lines', args: { path: 'f.js', start: '2', end: '3', new: 'X\nY\nZ' } })
+  assert.match(out, /^OK: replaced lines 2-3 with 3 line/)
+  assert.equal(readFileSync(join(root, 'f.js'), 'utf8'), 'a\nX\nY\nZ\nd\n')
+  assert.match(await execute(root, { tool: 'replace_lines', args: { path: 'f.js', start: '9', end: '10', new: 'x' } }), /invalid line range/)
+})
+
+test('replaceFunction finds JS/py functions by name and re-indents the new text', async () => {
+  const { replaceFunction, findFunctions } = await import('../src/tools/fn.js')
+  const js = 'class C {\n  a() {\n    return "}"\n  }\n  evaluate(x) {\n    // { comment\n    return x\n  }\n}\nfunction evaluate2(y) { return y }\n'
+  const r = replaceFunction(js, 'evaluate', 'evaluate(x) {\n  return x * 2\n}')
+  assert.ok(r.ok)
+  if (r.ok) assert.equal(r.result, 'class C {\n  a() {\n    return "}"\n  }\n  evaluate(x) {\n    return x * 2\n  }\n}\nfunction evaluate2(y) { return y }\n')
+  const py = 'def a():\n    return 1\n\ndef b(x):\n    y = x\n\n    return y\n\nz = 3\n'
+  const p = replaceFunction(py, 'b', 'def b(x):\n    return x + 1')
+  assert.ok(p.ok)
+  if (p.ok) assert.equal(p.result, 'def a():\n    return 1\n\ndef b(x):\n    return x + 1\n\nz = 3\n')
+  assert.equal(findFunctions('function f() {}\nfunction f() {}\n', 'f').length, 2)
+  assert.ok(!replaceFunction('function f() {}\nfunction f() {}\n', 'f', 'function f(){}').ok)
+  const miss = replaceFunction(js, 'nope', 'x')
+  assert.ok(!miss.ok && /Functions found/.test((miss as { error: string }).error))
+})

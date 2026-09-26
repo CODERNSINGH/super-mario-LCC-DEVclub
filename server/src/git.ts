@@ -52,3 +52,26 @@ async function defaultBranch(repo: string, token: string): Promise<string> {
   const r = await fetch(`https://api.github.com/repos/${repo}`, { headers: { Authorization: `Bearer ${token}` } })
   return ((await r.json()) as { default_branch: string }).default_branch
 }
+
+export interface CommitInput { root: string; branch?: string; message: string; author?: { name: string; email: string } }
+
+/** Commits all working-tree changes locally (no push). Creates/switches to `branch` when given. */
+export async function commitLocal(i: CommitInput): Promise<{ sha: string; branch: string }> {
+  const g = simpleGit(i.root)
+  if (!(await g.checkIsRepo())) throw new Error('This folder is not a git repository')
+  if (!(await changedFiles(i.root)).length) throw new Error('No changes to commit')
+  if (i.branch) {
+    const branches = await g.branchLocal()
+    if (branches.current !== i.branch) await (branches.all.includes(i.branch) ? g.checkout(i.branch) : g.checkoutLocalBranch(i.branch))
+  }
+  const hasName = (await g.getConfig('user.name')).value, hasEmail = (await g.getConfig('user.email')).value
+  if (i.author && !hasName) await g.addConfig('user.name', i.author.name, false, 'local')
+  if (i.author && !hasEmail) await g.addConfig('user.email', i.author.email, false, 'local')
+  if (!i.author && (!hasName || !hasEmail)) {
+    if (!hasName) await g.addConfig('user.name', 'Sakai', false, 'local')
+    if (!hasEmail) await g.addConfig('user.email', 'sakai@localhost', false, 'local')
+  }
+  await g.add('.')
+  await g.commit(i.message.trim() || 'Sakai changes')
+  return { sha: (await g.revparse(['HEAD'])).trim(), branch: (await g.branchLocal()).current }
+}
