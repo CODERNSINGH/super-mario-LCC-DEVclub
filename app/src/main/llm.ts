@@ -1,0 +1,61 @@
+import { ipcMain } from 'electron'
+import { getSecret } from './store'
+
+export interface ProviderDef {
+  id: string
+  name: string
+  kind: 'openai' | 'anthropic' | 'ollama'
+  baseUrl: string
+  needsKey: boolean
+  models: string[]
+  note?: string
+}
+
+export const PROVIDERS: ProviderDef[] = [
+  { id: 'groq', name: 'Groq', kind: 'openai', baseUrl: 'https://api.groq.com/openai/v1', needsKey: true, models: ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'llama-3.3-70b-versatile', 'qwen/qwen3-32b'], note: 'Fast free tier — good for trying Sakai.' },
+  { id: 'deepseek', name: 'DeepSeek', kind: 'openai', baseUrl: 'https://api.deepseek.com/v1', needsKey: true, models: ['deepseek-chat', 'deepseek-reasoner'] },
+  { id: 'qwen', name: 'Qwen (DashScope)', kind: 'openai', baseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1', needsKey: true, models: ['qwen3-coder-plus', 'qwen-max'] },
+  { id: 'openai', name: 'OpenAI', kind: 'openai', baseUrl: 'https://api.openai.com/v1', needsKey: true, models: ['gpt-4.1', 'gpt-4.1-mini'] },
+  { id: 'anthropic', name: 'Anthropic', kind: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', needsKey: true, models: ['claude-sonnet-5', 'claude-haiku-4-5-20251001'] },
+  { id: 'ollama', name: 'Ollama (local)', kind: 'ollama', baseUrl: 'http://localhost:11434', needsKey: false, models: [], note: 'Detected automatically if Ollama is running.' },
+  { id: 'lmstudio', name: 'LM Studio (local)', kind: 'openai', baseUrl: 'http://localhost:1234/v1', needsKey: false, models: [], note: 'Start the LM Studio local server first.' },
+]
+
+export interface TestResult { ok: boolean; message: string; models?: string[] }
+
+export async function testProvider(id: string, apiKey: string, baseUrl?: string): Promise<TestResult> {
+  const p = PROVIDERS.find((x) => x.id === id)
+  if (!p) return { ok: false, message: 'Unknown provider' }
+  const base = (baseUrl || p.baseUrl).replace(/\/$/, '')
+  try {
+    let res: Response
+    if (p.kind === 'ollama') {
+      res = await fetch(`${base}/api/tags`, { signal: AbortSignal.timeout(4000) })
+      if (!res.ok) return { ok: false, message: `Ollama responded ${res.status}` }
+      const data = (await res.json()) as { models: { name: string }[] }
+      const models = data.models.map((m) => m.name)
+      return models.length ? { ok: true, message: `Connected — ${models.length} model(s)`, models } : { ok: false, message: 'Ollama is running but has no models. Run: ollama pull qwen2.5-coder' }
+    }
+    if (p.kind === 'anthropic') {
+      res = await fetch(`${base}/models`, { headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' }, signal: AbortSignal.timeout(8000) })
+    } else {
+      res = await fetch(`${base}/models`, { headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {}, signal: AbortSignal.timeout(8000) })
+    }
+    if (res.status === 401 || res.status === 403) return { ok: false, message: 'API key rejected' }
+    if (!res.ok) return { ok: false, message: `Provider responded ${res.status}` }
+    const data = (await res.json()) as { data?: { id: string }[] }
+    return { ok: true, message: 'Connected', models: data.data?.map((m) => m.id) }
+  } catch (e) {
+    return { ok: false, message: p.kind === 'ollama' || id === 'lmstudio' ? 'Not reachable — is it running?' : `Network error: ${(e as Error).message}` }
+  }
+}
+
+const ENV_KEYS: Record<string, string> = { groq: 'GROQ_API_KEY', deepseek: 'DEEPSEEK_API_KEY', qwen: 'DASHSCOPE_API_KEY', openai: 'OPENAI_API_KEY', anthropic: 'ANTHROPIC_API_KEY' }
+
+export function registerLlmIpc(): void {
+  ipcMain.handle('llm:key', (_e, id: string) => getSecret(`llm:${id}`) || (ENV_KEYS[id] ? process.env[ENV_KEYS[id]] ?? '' : ''))
+  ipcMain.handle('llm:envKey', (_e, id: string) => (ENV_KEYS[id] ? process.env[ENV_KEYS[id]] ?? '' : ''))
+  ipcMain.handle('llm:providers', () =>
+    PROVIDERS.map((p) => (p.id === 'ollama' && process.env.OLLAMA_HOST ? { ...p, baseUrl: process.env.OLLAMA_HOST } : p.id === 'lmstudio' && process.env.LMSTUDIO_HOST ? { ...p, baseUrl: process.env.LMSTUDIO_HOST } : p)))
+  ipcMain.handle('llm:test', (_e, id: string, key: string, baseUrl?: string) => testProvider(id, key, baseUrl))
+}
