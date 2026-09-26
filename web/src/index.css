@@ -1,0 +1,3 @@
+@import "tailwindcss";
+@theme { --color-sakai:#bc002d; --color-bg:#0b0b0c; --color-panel:#111113; --color-line:#1f1f23; --color-muted:#8a8a90; }
+body { background: var(--color-bg); color:#d8d8da; font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",Inter,sans-serif; }
