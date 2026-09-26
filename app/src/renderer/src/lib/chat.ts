@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { post, resolveLlm, sessionUrl } from './api'
 import { useSession } from './session'
 import { useApp } from '../store'
+import { onAgentEdit, refreshChanges } from './diff'
 
 export interface ToolCall { tool: string; args: Record<string, string> }
 export type Item =
@@ -12,11 +13,12 @@ export type Item =
   | { kind: 'result'; id: string; finished: boolean; summary: string }
   | { kind: 'error'; id: string; text: string }
   | { kind: 'note'; id: string; text: string }
+  | { kind: 'phase'; id: string; label: string }
 
 export interface Usage { inputTokens: number; outputTokens: number; steps: number }
-export interface Chat { sessionId: string | null; mode: 'solve' | 'chat'; items: Item[]; phase: 'idle' | 'running'; usage: Usage; status: string }
+export interface Chat { sessionId: string | null; mode: 'solve' | 'chat'; items: Item[]; phase: 'idle' | 'running'; usage: Usage; status: string; startedAt: number | null; limitMin: number }
 
-const blank = (): Chat => ({ sessionId: null, mode: 'chat', items: [], phase: 'idle', usage: { inputTokens: 0, outputTokens: 0, steps: 0 }, status: '' })
+const blank = (): Chat => ({ sessionId: null, mode: 'chat', items: [], phase: 'idle', usage: { inputTokens: 0, outputTokens: 0, steps: 0 }, status: '', startedAt: null, limitMin: 8 })
 
 interface Store { chats: Record<string, Chat>; patch: (root: string, f: (c: Chat) => Chat) => void }
 export const useChatStore = create<Store>((set) => ({
@@ -37,6 +39,8 @@ type Ev =
   | { type: 'phase'; data: 'running' | 'idle' }
   | { type: 'done'; data: { finished: boolean; summary: string; inputTokens: number; outputTokens: number; steps: number } }
 
+export const PHASE = /^(Preparing environment|Running baseline tests|Running the issue reproduction|Finding relevant code|Running tests|Starting a fresh attempt)/
+
 /** Applies one server event to a chat. Pure and idempotent enough to replay history from scratch. */
 export function reduce(c: Chat, e: Ev): Chat {
   const items = [...c.items]
@@ -49,8 +53,11 @@ export function reduce(c: Chat, e: Ev): Chat {
   const closeAi = () => { const l = items[items.length - 1]; if (l?.kind === 'ai' && l.streaming) items[items.length - 1] = { ...l, streaming: false } }
 
   switch (e.type) {
-    case 'status': return { ...c, status: e.data }
-    case 'phase': if (e.data === 'idle') closeAi(); return { ...c, items, phase: e.data, status: e.data === 'idle' ? '' : c.status }
+    case 'status': {
+      if (PHASE.test(e.data) && !(last?.kind === 'phase' && last.label === e.data)) items.push({ kind: 'phase', id: nid(), label: e.data })
+      return { ...c, items, status: e.data }
+    }
+    case 'phase': if (e.data === 'idle') closeAi(); return { ...c, items, phase: e.data, status: e.data === 'idle' ? '' : c.status, startedAt: e.data === 'idle' ? null : c.startedAt ?? Date.now() }
     case 'usage': return { ...c, usage: e.data }
     case 'thinking': { const a = streamingAi(); a.thinking += e.data; putAi(a); return { ...c, items } }
     case 'token': { const a = streamingAi(); a.text += e.data; putAi(a); return { ...c, items } }
@@ -80,26 +87,45 @@ export function reduce(c: Chat, e: Ev): Chat {
   }
 }
 
-/** Live activity for the status bar + Output/Debug panels. */
+const clip = (t: string, n = 3) => strip(t).split('\n').filter(Boolean).slice(0, n).join(' ⏎ ').slice(0, 300)
+const strip = (t: string) => t.replace(/\u001b\[[0-9;]*m/g, '')
+const WRITES = new Set(['replace', 'write_file', 'revert'])
+
+/** Live activity for the status bar + Output/Debug panels: every event is logged with a timestamp. */
 function mirror(e: Ev) {
   const s = useSession.getState()
-  if (e.type === 'status') { s.set({ activity: e.data }); s.log(`· ${e.data}`) }
-  if (e.type === 'tool' && e.data.out !== undefined) {
-    const a = e.data.call.args
-    s.dbg(`$ ${e.data.call.tool} ${a.command ?? a.path ?? a.pattern ?? ''}`)
-    s.dbg(e.data.out.split('\n').slice(0, 6).join('\n'))
-    const fails = [...e.data.out.replace(/\u001b\[[0-9;]*m/g, '').matchAll(/^\s*●\s+(.+)$/gm)].map((m) => m[1].trim())
-    if (fails.length) s.set({ problems: fails.map((message) => ({ message, source: 'tests', severity: 'error' as const })) })
-    else if (/ALL PASS/.test(e.data.out)) s.set({ problems: [] })
+  const log = (t: string, l?: 'info' | 'warn' | 'error') => s.log(t, l, true)
+  switch (e.type) {
+    case 'status':
+      s.set({ activity: e.data })
+      log(PHASE.test(e.data) ? `── Phase: ${e.data} ──` : `· ${e.data}`, /Invalid tool call|rejected/.test(e.data) ? 'warn' : 'info'); break
+    case 'phase': log(`phase → ${e.data}`); if (e.data === 'idle') s.set({ activity: '' }); break
+    case 'user': log(`user: ${e.data.slice(0, 200)}`); break
+    case 'usage': log(`usage: ${e.data.inputTokens} in / ${e.data.outputTokens} out · ${e.data.steps} steps`); break
+    case 'thinking': case 'token': break
+    case 'assistant': s.dbg(`[assistant] ${e.data}`); break
+    case 'tool': {
+      const a = e.data.call.args
+      const argStr = Object.entries(a).map(([k, v]) => `${k}=${JSON.stringify(String(v).slice(0, 80))}`).join(' ')
+      if (e.data.out === undefined) { log(`$ ${e.data.call.tool} ${argStr}`); s.dbg(`[tool→] ${JSON.stringify(e.data.call)}`); break }
+      const out = strip(e.data.out)
+      log(`  ↳ ${e.data.call.tool}: ${clip(out)}`, /FAILING|exit [1-9]|error/i.test(out.slice(0, 200)) ? 'warn' : 'info')
+      s.dbg(`[tool←] ${e.data.call.tool} ${argStr}\n${out.split('\n').slice(0, 12).join('\n')}`)
+      const fails = [...out.matchAll(/^\s*●\s+(.+)$/gm)].map((m) => m[1].trim())
+      if (fails.length) s.set({ problems: fails.map((message) => ({ message, source: 'tests', severity: 'error' as const })) })
+      else if (/ALL PASS/.test(out)) s.set({ problems: [] })
+      if (WRITES.has(e.data.call.tool) && a.path) onAgentEdit(a.path)
+      break
+    }
+    case 'error': log(`✗ ${e.data}`, 'error'); s.set({ problems: [...s.problems, { message: e.data, source: 'agent', severity: 'error' }] }); break
+    case 'done': log(e.data.finished ? `✓ ${e.data.summary}` : `${/^Time limit/.test(e.data.summary) ? '!' : '✗'} ${e.data.summary}`, e.data.finished ? 'info' : /^Time limit/.test(e.data.summary) ? 'warn' : 'error'); void refreshChanges(); break
   }
-  if (e.type === 'error') { s.log(`✗ ${e.data}`); s.set({ problems: [...s.problems, { message: e.data, source: 'agent', severity: 'error' }] }) }
-  if (e.type === 'phase' && e.data === 'idle') s.set({ activity: '' })
-  if (e.type === 'done') s.log(e.data.finished ? `✓ ${e.data.summary}` : `✗ ${e.data.summary}`)
 }
 
 async function attach(root: string, id: string) {
   streams.get(root)?.abort()
   const ac = new AbortController(); streams.set(root, ac)
+  useSession.setState((x) => ({ logs: x.logs.filter((l) => !l.agent), debug: [] })) // server replays history
   useChatStore.getState().patch(root, (c) => ({ ...c, items: c.items.filter((i) => i.kind === 'task'), sessionId: id })) // history is replayed by the server
   for (let attempt = 0; attempt < 5 && !ac.signal.aborted; attempt++) {
     try {
@@ -130,13 +156,13 @@ async function attach(root: string, id: string) {
   }
 }
 
-export interface StartOpts { issue?: { number?: number; title: string; body: string }; notes?: string; testCommand?: string; maxSteps?: number }
+export interface StartOpts { issue?: { number?: number; title: string; body: string }; notes?: string; testCommand?: string; maxSteps?: number; timeLimitMin?: number }
 
 /** Creates a session ('solve' for an issue/task, 'chat' for conversation) and attaches to its event stream. */
 export async function startSession(root: string, mode: 'solve' | 'chat', o: StartOpts = {}): Promise<string> {
   const llm = await resolveLlm()
-  const { id } = await post<{ id: string }>('/session', { root, llm, mode, ...o }, true)
-  useChatStore.getState().patch(root, () => ({ ...blank(), mode, sessionId: id, phase: 'running',
+  const { id } = await post<{ id: string }>('/session', { root, llm, mode, timeLimitMin: useSession.getState().timeLimitMin, ...o }, true)
+  useChatStore.getState().patch(root, () => ({ ...blank(), mode, sessionId: id, phase: 'running', startedAt: Date.now(), limitMin: o.timeLimitMin ?? useSession.getState().timeLimitMin,
     items: o.issue ? [{ kind: 'task', id: nid(), title: o.issue.title, body: o.issue.body, number: o.issue.number }] : [] }))
   void attach(root, id)
   return id
@@ -147,7 +173,7 @@ export async function sendMessage(root: string, text: string): Promise<void> {
   if (!t) return
   let c = useChatStore.getState().chats[root]
   if (!c?.sessionId) { await startSession(root, 'chat'); c = useChatStore.getState().chats[root] }
-  useChatStore.getState().patch(root, (x) => ({ ...x, items: [...x.items, { kind: 'user', id: nid(), text: t, pending: true }], phase: 'running' }))
+  useChatStore.getState().patch(root, (x) => ({ ...x, items: [...x.items, { kind: 'user', id: nid(), text: t, pending: true }], phase: 'running', startedAt: x.startedAt ?? Date.now(), limitMin: useSession.getState().timeLimitMin }))
   try { await post(`/session/${c.sessionId}/message`, { text: t }, true) } catch (e) {
     useChatStore.getState().patch(root, (x) => reduce({ ...x, phase: 'idle' }, { type: 'error', data: (e as Error).message }))
   }

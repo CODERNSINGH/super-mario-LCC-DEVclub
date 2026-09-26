@@ -91,7 +91,12 @@ export function applyReplace(src: string, old: string, neu: string): { ok: true;
   return { ok: false, error: "ERROR: 'old' not found. Use read_file on the file and copy the lines exactly." }
 }
 
+const TOOL_JSON = /\{\s*"tool"\s*:\s*"/
+
 export async function execute(root: string, rawCall: ToolCall, opts: { readOnly?: boolean } = {}): Promise<string> {
+  for (const k of ['new', 'content']) {
+    if (rawCall.args?.[k] && TOOL_JSON.test(rawCall.args[k])) return `ERROR: your "${k}" text contains tool-call JSON (probably two calls in one reply). Send ONE tool call whose "${k}" holds only the code.`
+  }
   const call = { ...rawCall, tool: ALIASES[rawCall.tool] ?? rawCall.tool }
   const a = { ...(call.args ?? {}) }
   if (a.path) a.path = cleanPath(a.path)!
@@ -189,7 +194,9 @@ function repairJson(s: string): string {
 const ARG_KEYS = ['command', 'pattern', 'path', 'name', 'line', 'start', 'end', 'old', 'new', 'content', 'summary', 'thought']
 
 /** Last resort: pull fields out by key names, so unescaped quotes inside code (`"new": "a = "b""`) still work. */
-function lenientParse(text: string): ToolCall | null {
+function lenientParse(full: string): ToolCall | null {
+  // Models sometimes emit several tool objects in one reply; only the first is meant to run.
+  const text = full.split(/\}\s*\}\s*(?:```)?\s*\{\s*"tool"/)[0]
   const tool = text.match(/"tool"\s*:\s*"([\w.-]+)"/)?.[1]
   if (!tool) return null
   const argsAt = text.search(/"args"\s*:/)

@@ -16,9 +16,10 @@ function usable(live: string[] | undefined, curated: string[]): string[] {
 }
 
 type P = Awaited<ReturnType<typeof window.sakai.llm.providers>>[number]
-const ORDER = ['groq', 'deepseek', 'qwen', 'openai', 'anthropic', 'ollama', 'lmstudio']
-const TAG: Record<string, string> = { groq: 'Fast · free tier', deepseek: 'Evaluation model', qwen: 'Evaluation model', openai: 'ChatGPT / GPT-4.1', anthropic: 'Claude', ollama: 'Runs on this Mac', lmstudio: 'Runs on this Mac' }
-const NAME: Record<string, string> = { openai: 'OpenAI', qwen: 'Qwen', lmstudio: 'LM Studio', ollama: 'Ollama' }
+const ORDER = ['groq', 'deepseek', 'qwen', 'qwen-cn', 'openai', 'anthropic', 'ollama', 'lmstudio']
+const host = (u: string) => { try { return new URL(u).host } catch { return u } }
+const sub = (p: P) => `${p.needsKey ? 'Direct API' : 'Local'} · ${host(p.baseUrl)}`
+const NAME: Record<string, string> = { openai: 'OpenAI', qwen: 'Qwen (Intl)', 'qwen-cn': 'Qwen (China)', lmstudio: 'LM Studio', ollama: 'Ollama' }
 
 export function LlmScreen() {
   const { mode, llm, set } = useApp()
@@ -59,7 +60,7 @@ export function LlmScreen() {
         {providers.map((p) => (
           <button key={p.id} onClick={() => choose(p)} className={`flex items-center gap-3 p-2.5 rounded-xl border text-left transition-all ${sel?.id === p.id ? 'border-sakai bg-sakai/10' : 'border-line bg-panel/80 hover:border-line2 hover:bg-raised'}`}>
             <BrandTile id={p.id} size={36} />
-            <span className="min-w-0"><span className="block text-ink text-[13px] font-medium truncate">{NAME[p.id] ?? p.name.replace(/ \(.*\)/, '')}</span><span className="block text-[11px] text-muted truncate">{TAG[p.id] ?? ''}</span></span>
+            <span className="min-w-0"><span className="block text-ink text-[13px] font-medium truncate">{NAME[p.id] ?? p.name.replace(/ \(.*\)/, '')}</span><span className="block text-[11px] text-muted truncate">{sub(p)}</span></span>
             {llm?.provider === p.id && sel?.id !== p.id && <Check size={14} className="ml-auto text-sakai" />}
           </button>
         ))}
@@ -68,6 +69,7 @@ export function LlmScreen() {
       {sel && (
         <div className="mt-3 rounded-xl border border-line bg-panel p-3.5 space-y-3 fade">
           {sel.note && <p className="text-xs text-muted">{sel.note}</p>}
+          {sel.needsKey && <p className="text-[11px] text-faint">Requests go straight from this app to <span className="font-mono text-muted">{host(sel.baseUrl)}</span> — no third-party gateway or proxy.</p>}
           {sel.needsKey && (
             <div className="flex gap-2">
               <div className="flex-1 flex items-center h-9 rounded-md bg-bg border border-line focus-within:border-sakai">

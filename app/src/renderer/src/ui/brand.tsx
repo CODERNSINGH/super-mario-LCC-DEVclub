@@ -18,7 +18,8 @@ const png: Record<string, string> = { aws, azure, gcloud, gitlab, bitbucket, jir
 const svg: Record<string, string> = { deepseek, qwen, anthropic, ollama }
 
 /** Brand mark on a white tile (white is a Sakai brand color, and keeps dark wordmarks legible on the dark UI). */
-export function BrandTile({ id, size = 36 }: { id: string; size?: number }) {
+export function BrandTile({ id: rawId, size = 36 }: { id: string; size?: number }) {
+  const id = rawId === 'qwen-cn' ? 'qwen' : rawId
   const inner = Math.round(size * 0.62)
   return (
     <span className="grid place-items-center rounded-lg bg-white shrink-0" style={{ width: size, height: size }}>

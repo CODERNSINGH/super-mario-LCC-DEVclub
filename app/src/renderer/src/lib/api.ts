@@ -26,7 +26,7 @@ export async function resolveLlm(): Promise<LlmConfig> {
   const p = providers.find((x) => x.id === choice.provider)!
   const apiKey = await window.sakai.llm.key(p.id)
   // Hosted OpenAI-compatible APIs support native function calling; local runtimes use the text protocol.
-  const native = ['groq', 'openai', 'deepseek', 'qwen'].includes(p.id) && !/reasoner/.test(choice.model)
+  const native = ['groq', 'openai', 'deepseek', 'qwen', 'qwen-cn'].includes(p.id) && !/reasoner/.test(choice.model)
   return { baseUrl: p.baseUrl, apiKey, model: choice.model, kind: p.kind as LlmConfig['kind'], native }
 }
 

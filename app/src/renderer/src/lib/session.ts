@@ -1,8 +1,10 @@
 import { create } from 'zustand'
 
-export type Tab = { id: string; kind: 'welcome' | 'file' | 'diff' | 'settings'; title: string; path?: string }
+export type Tab = { id: string; kind: 'welcome' | 'file' | 'diff' | 'settings'; title: string; path?: string; live?: boolean }
 export interface Issue { number: number; title: string; body: string; labels: string[] }
 export interface Estimate { repoTokens: number; steps: number; inputTokens: number; outputTokens: number; costUsd: number; minutes: number; complexity: string; testCommand: string | null; tips: string[]; priced: boolean }
+export interface FileStat { add: number; del: number; status: 'A' | 'M' | 'D'; added: number[]; removedAt: number[] }
+export interface LogLine { ts: number; level: 'info' | 'warn' | 'error'; text: string; agent?: boolean }
 export type Side = 'explorer' | 'search' | 'scm' | 'issues' | 'quick'
 export type PanelTab = 'problems' | 'output' | 'debug' | 'terminal'
 export interface ModalSpec { title: string; body: string; confirm: string; cancel?: string; onConfirm: () => void }
@@ -22,16 +24,17 @@ interface Session {
   agentView: 'chat' | 'task'
   composerText: string
   ready: boolean; cloneFailed: boolean
-  logs: string[]; debug: string[]; problems: Problem[]
+  logs: LogLine[]; debug: string[]; problems: Problem[]
   issues: Issue[]; picked: Issue | null
-  goal: string; notes: string; testCommand: string; branch: string; stepLimit: number
+  goal: string; notes: string; testCommand: string; branch: string; stepLimit: number; timeLimitMin: number
+  stats: Record<string, FileStat>; rev: number
   estimate: Estimate | null
   changed: string[]
   cursor: { line: number; col: number }
   activity: string
   set: (p: Partial<Session>) => void
   setSize: (p: Partial<Pick<Session, 'sideW' | 'agentW' | 'panelH'>>) => void
-  log: (l: string) => void
+  log: (l: string, level?: LogLine['level'], agent?: boolean) => void
   dbg: (l: string) => void
   openTab: (t: Tab) => void
   closeTab: (id: string) => void
@@ -42,7 +45,7 @@ const fresh = () => ({
   tabs: [{ id: 'welcome', kind: 'welcome', title: 'Welcome' } as Tab], active: 'welcome', dirty: {}, termId: 0,
   ready: false, cloneFailed: false,
   logs: [], debug: [], problems: [], issues: [], picked: null,
-  goal: '', notes: '', testCommand: '', branch: '', stepLimit: 30, estimate: null, changed: [],
+  goal: '', notes: '', testCommand: '', branch: '', stepLimit: 30, timeLimitMin: 8, stats: {}, rev: 0, estimate: null, changed: [],
   cursor: { line: 1, col: 1 }, activity: '',
 })
 
@@ -54,7 +57,7 @@ export const useSession = create<Session>((set) => ({
   palette: null, modal: null, agentView: 'chat', composerText: '',
   set: (p) => set(p),
   setSize: (p) => { saveLayout(p as Record<string, number>); set(p) },
-  log: (l) => set((s) => ({ logs: [...s.logs.slice(-800), l] })),
+  log: (l, level, agent) => set((s) => ({ logs: [...s.logs.slice(-1500), { ts: Date.now(), level: level ?? (l.startsWith('✗') ? 'error' : l.startsWith('!') ? 'warn' : 'info'), text: l, agent }] })),
   dbg: (l) => set((s) => ({ debug: [...s.debug.slice(-800), l] })),
   openTab: (t) => set((s) => ({ tabs: s.tabs.some((x) => x.id === t.id) ? s.tabs : [...s.tabs, t], active: t.id })),
   closeTab: (id) => set((s) => {

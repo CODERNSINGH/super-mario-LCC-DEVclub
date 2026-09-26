@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { Maximize2, Minimize2, X, CircleX, TriangleAlert, Plus } from 'lucide-react'
+import { Maximize2, Minimize2, X, CircleX, TriangleAlert, Plus, Trash2 } from 'lucide-react'
 import { useSession, type PanelTab } from '../lib/session'
 import { useApp } from '../store'
 import { Terminal } from '../components/Terminal'
@@ -12,7 +12,9 @@ export function Panel() {
   const localPath = useApp((a) => a.localPath)
   const end = useRef<HTMLDivElement>(null)
   useEffect(() => { end.current?.scrollIntoView() }, [s.logs.length, s.debug.length, s.panel])
-  const line = (l: string, i: number) => <div key={i} className={`whitespace-pre-wrap leading-[18px] ${l.startsWith('✗') ? 'text-sakai' : l.startsWith('$') || l.startsWith('✓') ? 'text-ink' : l.startsWith('!') ? 'text-fg' : 'text-fg/80'}`}>{l}</div>
+  const ts = (t: number) => new Date(t).toLocaleTimeString([], { hour12: false })
+  const clear = () => s.set(s.panel === 'debug' ? { debug: [] } : { logs: [], problems: s.panel === 'problems' ? [] : s.problems })
+  const dline = (l: string, i: number) => <div key={i} className={`whitespace-pre-wrap leading-[18px] ${l.startsWith('[tool') ? 'text-fg' : 'text-fg/70'}`}>{l}</div>
   return (
     <div className="flex flex-col min-h-0 h-full bg-panel border-t border-line">
       <div className="h-[35px] shrink-0 px-2 flex items-center gap-0.5 border-b border-line overflow-hidden">
@@ -25,6 +27,7 @@ export function Panel() {
         ))}</div>
         <span className="ml-auto flex items-center gap-1 text-muted shrink-0">
           {s.cloneFailed && <button onClick={() => window.dispatchEvent(new Event('sakai:retry'))} className="h-5 px-2 mr-1 rounded bg-sakai text-ink text-[11px] normal-case tracking-normal">Retry</button>}
+          {(s.panel === 'output' || s.panel === 'debug' || s.panel === 'problems') && <button title="Clear" onClick={clear} className="h-6 px-1.5 flex items-center gap-1 text-[11px] hover:text-ink"><Trash2 size={12} />Clear</button>}
           {s.panel === 'terminal' && <button title="New Terminal" onClick={A.openTerminal} className="w-6 h-6 grid place-items-center hover:text-ink"><Plus size={14} /></button>}
           <button title={s.panelMax ? 'Restore Panel Size' : 'Maximize Panel Size'} onClick={() => s.set({ panelMax: !s.panelMax })} className="w-6 h-6 grid place-items-center hover:text-ink">{s.panelMax ? <Minimize2 size={13} /> : <Maximize2 size={13} />}</button>
           <button title="Close Panel" onClick={() => s.set({ panelOpen: false, panelMax: false })} className="w-6 h-6 grid place-items-center hover:text-ink"><X size={14} /></button>
@@ -33,8 +36,11 @@ export function Panel() {
       <div className="flex-1 min-h-0 relative">
         {(s.panel === 'output' || s.panel === 'debug') && (
           <div className="absolute inset-0 overflow-auto px-4 py-2 font-mono text-[12px] selectable">
-            {(s.panel === 'output' ? s.logs : s.debug).map(line)}
-            {(s.panel === 'output' ? s.logs : s.debug).length === 0 && <p className="text-faint font-sans">{s.panel === 'output' ? 'Sakai output will appear here.' : 'Agent tool calls stream here while it works.'}</p>}
+            {s.panel === 'output' ? s.logs.map((l, i) => (
+              <div key={i} className={`whitespace-pre-wrap leading-[18px] ${l.level === 'error' ? 'text-sakai' : l.level === 'warn' ? 'text-ink' : l.text.startsWith('$') || l.text.startsWith('✓') || l.text.startsWith('──') ? 'text-ink' : 'text-fg/80'}`}>
+                <span className="text-faint">{ts(l.ts)} </span><span className={`inline-block w-[38px] text-[10px] uppercase ${l.level === 'error' ? 'text-sakai' : l.level === 'warn' ? 'text-ink font-semibold' : 'text-faint'}`}>{l.level}</span>{l.text}
+              </div>)) : s.debug.map(dline)}
+            {(s.panel === 'output' ? s.logs : s.debug).length === 0 && <p className="text-faint font-sans">{s.panel === 'output' ? 'Sakai output will appear here.' : 'Raw assistant and tool stream appears here while the agent works.'}</p>}
             <div ref={end} />
           </div>
         )}

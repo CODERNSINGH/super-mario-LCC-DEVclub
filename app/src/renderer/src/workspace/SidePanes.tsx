@@ -7,6 +7,7 @@ import { FileIcon } from '../ui/icons'
 import { searchText, type Hit, type FNode, invalidateFiles } from '../lib/files'
 import { addQuick, removeQuick, runInTerminal, useQuick } from '../lib/quick'
 import * as A from '../lib/actions'
+import { refreshChanges } from '../lib/diff'
 import { revealLine } from '../lib/monaco'
 import { Button } from '../components/ui'
 
@@ -30,11 +31,12 @@ const PaneTitle = ({ children, right }: { children: ReactNode; right?: ReactNode
 
 function Tree({ path, depth, version }: { path: string; depth: number; version: number }) {
   const root = useApp((s) => s.localPath)!
-  const [nodes, setNodes] = useState<FNode[]>([])
+  const [nodes, setNodes] = useState<FNode[] | null>(null)
   const [open, setOpen] = useState<Record<string, boolean>>({})
   const active = useSession((s) => s.active)
   const changed = useSession((s) => s.changed)
   useEffect(() => { void post<FNode[]>('/fs/list', { root, path }).then(setNodes).catch(() => setNodes([])) }, [root, path, version])
+  if (nodes === null) return <>{[70, 50, 62].map((w, i) => <div key={i} className="h-[22px] flex items-center" style={{ paddingLeft: 24 + depth * 12 }}><span className="skel h-3" style={{ width: `${w}%` }} /></div>)}</>
   return (
     <>
       {nodes.map((n) => {
@@ -169,8 +171,7 @@ export function ScmPane() {
   const [note, setNote] = useState('')
   const refresh = useCallback(async () => {
     if (!localPath) return
-    const { files } = await post<{ files: string[] }>('/git/changes', { root: localPath }).catch(() => ({ files: [] as string[] }))
-    useSession.getState().set({ changed: files })
+    await refreshChanges(localPath, 0)
   }, [localPath])
   useEffect(() => { void refresh() }, [refresh])
 
@@ -194,7 +195,7 @@ export function ScmPane() {
       </div>
       <Section title={`Changes  ${s.changed.length}`} grow actions={<IconBtn title="Discard All Changes" onClick={discard}><Undo2 size={12} /></IconBtn>}>
         {s.changed.map((f) => (
-          <button key={f} onClick={() => A.openDiff(f)} className="row w-full text-left pl-4"><FileIcon name={f.split('/').pop()!} /><span className="truncate text-[13px]">{f.split('/').pop()}</span><span className="truncate text-[11.5px] text-faint">{f.includes('/') ? f.slice(0, f.lastIndexOf('/')) : ''}</span><span className="ml-auto text-[11px] font-semibold text-sakai">M</span></button>
+          <button key={f} onClick={() => A.openDiff(f)} className="row w-full text-left pl-4"><FileIcon name={f.split('/').pop()!} /><span className="truncate text-[13px]">{f.split('/').pop()}</span><span className="truncate text-[11.5px] text-faint">{f.includes('/') ? f.slice(0, f.lastIndexOf('/')) : ''}</span>{s.stats[f] && <span className="ml-auto font-mono text-[11px]"><span className="text-add">+{s.stats[f].add}</span> <span className="text-sakai">−{s.stats[f].del}</span></span>}<span className={`${s.stats[f] ? '' : 'ml-auto '}w-4 text-center text-[11px] font-semibold ${s.stats[f]?.status === 'A' ? 'text-add' : 'text-sakai'}`}>{s.stats[f]?.status ?? 'M'}</span></button>
         ))}
         {!s.changed.length && <p className="px-4 py-1 text-[12.5px] text-muted">No changes detected.</p>}
       </Section>

@@ -101,6 +101,7 @@ export function EditorArea() {
               {on && <span className="absolute top-0 left-0 right-0 h-[2px] bg-sakai" />}
               {t.kind === 'welcome' ? <img src={logo} width={15} height={15} alt="" /> : t.kind === 'settings' ? <span className="text-[11px]">⚙</span> : <FileIcon name={t.title.replace(/ \(.*\)$/, '')} />}
               <span className={t.kind === 'diff' ? 'italic' : ''}>{t.title}</span>
+              {t.kind === 'diff' && <span title="Changed by Sakai — live diff" className="w-1.5 h-1.5 rounded-full bg-add" />}
               <button onClick={(e) => { e.stopPropagation(); s.closeTab(t.id) }} className={`w-5 h-5 grid place-items-center rounded hover:bg-line2 ${s.dirty[t.id] ? '' : on ? '' : 'opacity-0 group-hover:opacity-100'}`}>
                 {s.dirty[t.id] ? <span className="w-2 h-2 rounded-full bg-fg group-hover:hidden" /> : null}<X size={13} className={s.dirty[t.id] ? 'hidden group-hover:block' : ''} />
               </button>

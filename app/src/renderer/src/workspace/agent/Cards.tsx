@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Search, FileText, Pencil, FilePlus, Undo2, Terminal, FlaskConical, Package, CheckCheck, ChevronRight, Loader2, Brain, GitPullRequest, GitCommitHorizontal, Trash2, ExternalLink } from 'lucide-react'
+import { Search, FileText, Pencil, FilePlus, Undo2, Terminal, FlaskConical, Package, CheckCheck, ChevronRight, Loader2, Brain, GitPullRequest, GitCommitHorizontal, Trash2, ExternalLink, Clock, Layers } from 'lucide-react'
 import { useApp } from '../../store'
 import { useSession } from '../../lib/session'
 import { post } from '../../lib/api'
@@ -7,6 +7,8 @@ import type { Item } from '../../lib/chat'
 import { FileIcon } from '../../ui/icons'
 import { Button } from '../../components/ui'
 import * as A from '../../lib/actions'
+import { openAllDiffs, refreshChanges } from '../../lib/diff'
+import { sendMessage } from '../../lib/chat'
 import { Md } from './Md'
 import logo from '../../assets/logo.png'
 
@@ -23,6 +25,8 @@ function describe(t: Tool) {
     case 'write_file': return { icon: FilePlus, verb: 'Created', detail: a.path, path: a.path }
     case 'revert': return { icon: Undo2, verb: 'Reverted', detail: a.path, path: a.path }
     case 'setup': return { icon: Package, verb: 'Installed dependencies', detail: '' }
+    case 'reproduce': return { icon: FlaskConical, verb: 'Reproduction', detail: a.command }
+    case 'restart': return { icon: Undo2, verb: 'Fresh attempt', detail: a.command }
     case 'baseline': return { icon: FlaskConical, verb: 'Baseline tests', detail: a.command }
     case 'finish': return { icon: CheckCheck, verb: 'Finished', detail: '' }
     default: return isTestCmd(a.command ?? '') ? { icon: FlaskConical, verb: 'Ran tests', detail: a.command } : { icon: Terminal, verb: 'Ran', detail: a.command ?? '' }
@@ -33,14 +37,27 @@ function Chip({ ok, children }: { ok: boolean; children: string }) {
   return <span className={`ml-auto shrink-0 px-1.5 h-[16px] rounded text-[10px] font-semibold flex items-center ${ok ? 'bg-white text-black' : 'bg-sakai text-ink'}`}>{children}</span>
 }
 
-export function DiffLines({ edit }: { edit: { old: string; new: string } }) {
-  const del = edit.old.split('\n').slice(0, 14), add = edit.new.split('\n').slice(0, 14)
+export function DiffLines({ edit }: { edit: { path?: string; old: string; new: string } }) {
+  const oldL = edit.old === '' ? [] : edit.old.split('\n'), newL = edit.new === '' ? [] : edit.new.split('\n')
+  const del = oldL.slice(0, 14), add = newL.slice(0, 14)
   return (
-    <pre className="font-mono text-[11.5px] leading-[17px] overflow-x-auto border-t border-line">
-      {del.map((l, i) => <div key={`d${i}`} className="px-3 bg-sakai/15 text-fg whitespace-pre"><span className="text-sakai select-none mr-2">−</span>{l}</div>)}
-      {add.map((l, i) => <div key={`a${i}`} className="px-3 bg-white/[.07] text-fg whitespace-pre"><span className="text-white select-none mr-2">+</span>{l}</div>)}
-    </pre>
+    <div className="border-t border-line">
+      <div className="h-6 px-3 flex items-center gap-2 text-[11px] bg-bg/60 border-b border-line/60">
+        {edit.path && <button onClick={() => A.openDiff(edit.path!)} className="font-mono text-fg hover:underline truncate">{edit.path}</button>}
+        <span className="ml-auto font-mono font-semibold text-add">+{newL.length}</span><span className="font-mono font-semibold text-sakai">−{oldL.length}</span>
+      </div>
+      <pre className="font-mono text-[11.5px] leading-[17px] overflow-x-auto">
+        {del.map((l, i) => <div key={`d${i}`} className="px-3 bg-sakai/20 text-fg whitespace-pre border-l-2 border-sakai"><span className="text-sakai select-none mr-2">−</span>{l}</div>)}
+        {oldL.length > 14 && <div className="px-3 text-faint">… {oldL.length - 14} more removed</div>}
+        {add.map((l, i) => <div key={`a${i}`} className="px-3 bg-add/20 text-fg whitespace-pre border-l-2 border-add"><span className="text-add select-none mr-2">+</span>{l}</div>)}
+        {newL.length > 14 && <div className="px-3 text-faint">… {newL.length - 14} more added</div>}
+      </pre>
+    </div>
   )
+}
+
+export function PhaseRow({ label }: { label: string }) {
+  return <div className="flex items-center gap-2 text-[10.5px] uppercase tracking-wider text-muted fade"><span className="h-px flex-1 bg-line2" /><span className="text-fg">{label}</span><span className="h-px flex-1 bg-line2" /></div>
 }
 
 export function ToolCard({ t }: { t: Tool }) {
@@ -129,7 +146,9 @@ export function ResultCard({ finished, summary }: { finished: boolean; summary: 
   const [msg, setMsg] = useState('')
   const [pr, setPr] = useState<{ url: string; number: number } | null>(null)
 
-  useEffect(() => { void post<{ files: string[] }>('/git/changes', { root: localPath }).then((r) => { setFiles(r.files); useSession.getState().set({ changed: r.files }) }).catch(() => undefined) }, [localPath])
+  useEffect(() => { void post<{ files: string[] }>('/git/changes', { root: localPath }).then((r) => { setFiles(r.files); useSession.getState().set({ changed: r.files }); void refreshChanges(localPath, 0) }).catch(() => undefined) }, [localPath])
+  const tot = Object.values(s.stats).reduce((a, x) => ({ add: a.add + x.add, del: a.del + x.del }), { add: 0, del: 0 })
+  const timeUp = /^Time limit reached/.test(summary)
   const title = s.picked ? `Fix #${s.picked.number}: ${s.picked.title}` : (s.goal || summary).slice(0, 70)
   const author = user ? { name: user.name || user.login, email: `${user.id ? user.id + '+' : ''}${user.login}@users.noreply.github.com` } : undefined
 
@@ -153,10 +172,18 @@ export function ResultCard({ finished, summary }: { finished: boolean; summary: 
 
   return (
     <div className="rounded-xl border border-line2 bg-panel overflow-hidden fade">
-      <div className={`px-3 h-8 flex items-center gap-2 text-[12px] border-b border-line ${finished ? 'text-ink' : 'text-sakai'}`}><span className={`w-2 h-2 rounded-full ${finished ? 'bg-white' : 'bg-sakai'}`} />{finished ? 'Verified fix ready' : 'Stopped before finishing'}</div>
+      <div className={`px-3 h-8 flex items-center gap-2 text-[12px] border-b border-line ${finished ? 'text-ink' : 'text-sakai'}`}><span className={`w-2 h-2 rounded-full ${finished ? 'bg-white' : 'bg-sakai'}`} />{finished ? 'Verified fix ready' : timeUp ? 'Time limit reached' : 'Stopped before finishing'}</div>
+      {timeUp && (
+        <div className="m-3 mb-0 rounded-lg border border-sakai/60 bg-sakai/15 px-3 py-2.5">
+          <div className="flex items-center gap-2 text-[12.5px] text-ink font-medium"><Clock size={14} className="text-sakai" />{summary.split(' — ')[0]}</div>
+          <p className="text-[11.5px] text-fg/80 mt-1">Your changes so far are kept. Continue the run or review what changed.</p>
+          <div className="flex gap-2 mt-2"><Button className="h-7 text-[12px]" onClick={() => localPath && void sendMessage(localPath, 'Continue where you left off')}>Continue</Button><Button variant="ghost" className="h-7 text-[12px]" onClick={() => (files.length ? openAllDiffs() : undefined)}>Review diff</Button></div>
+        </div>
+      )}
       <div className="p-3 space-y-3">
-        {summary && <Md text={summary} />}
-        {files.length > 0 && <div className="flex flex-wrap gap-1.5">{files.map((f) => <button key={f} onClick={() => A.openDiff(f)} className="h-6 pl-1.5 pr-2 rounded border border-line2 hover:border-sakai flex items-center gap-1.5 text-[11.5px] font-mono text-fg"><FileIcon name={f.split('/').pop()!} size={12} />{f}</button>)}</div>}
+        {summary && !timeUp && <Md text={summary} />}
+        {files.length > 0 && <div className="flex items-center gap-2 text-[12px]"><Layers size={13} className="text-muted" /><span className="text-ink font-medium">Review changes</span><span className="font-mono font-semibold text-add">+{tot.add}</span><span className="font-mono font-semibold text-sakai">−{tot.del}</span><span className="text-muted">in {files.length} file{files.length === 1 ? '' : 's'}</span><button onClick={openAllDiffs} className="ml-auto text-sakai hover:underline text-[11.5px]">Open all diffs</button></div>}
+        {files.length > 0 && <div className="flex flex-wrap gap-1.5">{files.map((f) => <button key={f} onClick={() => A.openDiff(f)} className="h-6 pl-1.5 pr-2 rounded border border-line2 hover:border-sakai flex items-center gap-1.5 text-[11.5px] font-mono text-fg"><FileIcon name={f.split('/').pop()!} size={12} />{f}{s.stats[f] && <span className="ml-1 font-semibold"><span className="text-add">+{s.stats[f].add}</span> <span className="text-sakai">−{s.stats[f].del}</span></span>}</button>)}</div>}
         {files.length === 0 && !msg && <p className="text-[12px] text-muted">No files were changed.</p>}
         <div className="flex flex-wrap gap-2 items-center">
           {pr ? <a href={pr.url} target="_blank" className="text-sakai text-[12.5px] underline underline-offset-2">Open pull request #{pr.number}</a>

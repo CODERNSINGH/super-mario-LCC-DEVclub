@@ -99,3 +99,11 @@ test('replaceFunction finds JS/py functions by name and re-indents the new text'
   const miss = replaceFunction(js, 'nope', 'x')
   assert.ok(!miss.ok && /Functions found/.test((miss as { error: string }).error))
 })
+
+test('two tool objects in one reply: only the first is used and no JSON leaks into edits', async () => {
+  const c = parseToolCall('```json\n{"tool":"replace_lines","args":{"path":"a.js","start":"82","end":"83","new":"  return result;\n}"}}\n{"tool":"finish","args":{"summary":"x"}}\n```')
+  assert.equal(c?.tool, 'replace_lines')
+  assert.ok(!/tool/.test(c?.args.new ?? ''))
+  const { execute } = await import('../src/tools/index.js')
+  assert.match(await execute('/tmp', { tool: 'replace_lines', args: { path: 'a.js', start: '1', end: '1', new: 'x}\n{"tool":"finish"' } }), /contains tool-call JSON/)
+})

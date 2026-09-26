@@ -14,6 +14,7 @@
   --color-hover: #1a1a1e;
   --color-line: #1f1f23;
   --color-line2: #2a2a30;
+  --color-add: #2ea043;
   --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif;
   --font-mono: "SF Mono", "JetBrains Mono", Menlo, monospace;
 }
@@ -63,3 +64,10 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 
 .kbd { font-family: var(--font-mono); font-size: 11px; color: var(--color-muted); }
 .xterm .xterm-viewport { background-color: transparent !important; }
+
+/* Monaco change decorations */
+.sk-add-line { background: rgba(46,160,67,.16); }
+.sk-add-gutter { border-left: 3px solid #2ea043; margin-left: 3px; }
+.sk-del-mark { border-top: 2px solid #bc002d; }
+.sk-del-gutter { border-left: 3px solid #bc002d; margin-left: 3px; }
+.skel { background: linear-gradient(90deg, #17171a 0, #212126 50%, #17171a 100%); background-size: 200% 100%; animation: shimmer 1.4s linear infinite; border-radius: 3px; }

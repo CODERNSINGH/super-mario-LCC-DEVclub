@@ -5,7 +5,7 @@ import { useSession } from '../../lib/session'
 import { useChat, sendMessage, stopSession, reattach, type Item } from '../../lib/chat'
 import { TaskForm } from './TaskForm'
 import { Composer } from './Composer'
-import { AiBubble, UserBubble, ToolCard, TaskCard, ErrorCard, ResultCard } from './Cards'
+import { AiBubble, UserBubble, ToolCard, TaskCard, ErrorCard, ResultCard, PhaseRow } from './Cards'
 import { Md } from './Md'
 import * as A from '../../lib/actions'
 import logo from '../../assets/logo.png'
@@ -55,6 +55,7 @@ function Transcript({ items, phase }: { items: Item[]; phase: 'idle' | 'running'
           : it.kind === 'user' ? <UserBubble key={it.id} it={it} />
           : it.kind === 'ai' ? <AiBubble key={it.id} it={it} />
           : it.kind === 'tool' ? <ToolCard key={it.id} t={it} />
+          : it.kind === 'phase' ? <PhaseRow key={it.id} label={it.label} />
           : it.kind === 'error' ? <ErrorCard key={it.id} text={it.text} />
           : it.kind === 'result' ? (it.id === lastResult ? <ResultCard key={it.id} finished={it.finished} summary={it.summary} /> : <div key={it.id} className="text-[11.5px] text-muted pl-8">Turn finished.</div>)
           : <div key={it.id} className="text-[12px] text-muted pl-8"><Md text={it.text} /></div>)}
@@ -68,12 +69,18 @@ function Transcript({ items, phase }: { items: Item[]; phase: 'idle' | 'running'
 function WorkingBar({ root }: { root: string }) {
   const chat = useChat(root)
   const est = useSession((s) => s.estimate)
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t) }, [])
+  const el = chat.startedAt ? Math.max(0, Math.floor((now - chat.startedAt) / 1000)) : 0
+  const left = Math.max(0, chat.limitMin * 60 - el)
+  const mmss = (n: number) => `${Math.floor(n / 60)}:${String(n % 60).padStart(2, '0')}`
   const total = chat.usage.inputTokens + chat.usage.outputTokens
   const cost = est?.priced && est.inputTokens + est.outputTokens > 0 ? (total / (est.inputTokens + est.outputTokens)) * est.costUsd : null
   return (
     <div className="shrink-0 mx-3 mb-1 rounded-lg border border-sakai/40 bg-sakai/10 px-3 h-9 flex items-center gap-2.5 fade">
       <span className="relative w-2 h-2"><span className="absolute inset-0 rounded-full bg-sakai animate-ping" /><span className="absolute inset-0 rounded-full bg-sakai" /></span>
       <span className="text-[12px] text-ink truncate flex-1">{chat.status || 'Sakai is working…'}</span>
+      <span className={`text-[11px] font-mono whitespace-nowrap ${left < 60 ? 'text-sakai font-semibold' : 'text-fg'}`} title={`Time limit ${chat.limitMin} min`}>{mmss(el)} · {mmss(left)} left</span>
       <span className="text-[11px] text-muted font-mono whitespace-nowrap">{chat.usage.steps} {chat.usage.steps === 1 ? "step" : "steps"} · {fmt(total)} tok{cost !== null ? ` · ~$${cost.toFixed(cost < 0.1 ? 3 : 2)}` : ''}</span>
       <button onClick={() => void stopSession(root)} className="h-6 px-2 rounded bg-sakai hover:bg-sakai-hover text-ink text-[11px] font-semibold flex items-center gap-1"><Square size={9} fill="currentColor" />Stop</button>
     </div>
