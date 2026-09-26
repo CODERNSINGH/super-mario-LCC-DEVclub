@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../store'
 import { useSession, type Estimate } from '../lib/session'
-import { cleanErr, post, resolveLlm, streamRun } from '../lib/api'
+import { cleanErr, isSmallModel, post, resolveLlm, streamRun } from '../lib/api'
 import { Button, Card } from '../components/ui'
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)
@@ -64,7 +64,7 @@ export function TaskPanel() {
     try {
       const cfg = await resolveLlm()
       const est = await post<Estimate>('/estimate', { root: localPath, issueText: issueText(), provider: llm!.provider, model: llm!.model, llm: cfg, withTips: true })
-      s.set({ estimate: est, phase: 'estimated', testCommand: s.testCommand || est.testCommand || '' })
+      s.set({ estimate: est, stepLimit: Math.min(100, Math.max(15, Math.round(est.steps * 1.5))), phase: 'estimated', testCommand: s.testCommand || est.testCommand || '' })
       setTimeout(() => estRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80)
     } catch (e) { setErr(cleanErr(e)); s.set({ phase: 'idle' }) }
   }
@@ -76,7 +76,7 @@ export function TaskPanel() {
       const cfg = await resolveLlm()
       if (s.branch) await post('/git/branch', { root: localPath, name: s.branch }).catch(() => undefined)
       s.log(`$ sakai run — ${llm!.provider}/${llm!.model}`)
-      await streamRun({ root: localPath, llm: cfg, issue: { number: s.picked?.number, title: s.goal, body: s.picked?.body ?? '' }, notes: s.notes, testCommand: s.testCommand || undefined }, (ev) => {
+      await streamRun({ root: localPath, llm: cfg, issue: { number: s.picked?.number, title: s.goal, body: s.picked?.body ?? '' }, notes: s.notes, testCommand: s.testCommand || undefined, maxSteps: s.stepLimit }, (ev) => {
         const st = useSession.getState()
         if (ev.type === 'usage') st.set({ usage: ev.data })
         if (ev.type === 'status') st.log(`· ${ev.data}`)
@@ -120,11 +120,14 @@ export function TaskPanel() {
         <Field label="What should Sakai solve?"><textarea rows={2} value={s.goal} onChange={(e) => s.set({ goal: e.target.value })} disabled={running} className={`${input} py-2`} placeholder="Describe the bug or feature" /></Field>
         {s.picked?.body && <details className="text-[12.5px]"><summary className="cursor-pointer text-muted">Issue description</summary><pre className="mt-2 whitespace-pre-wrap font-sans leading-relaxed">{s.picked.body}</pre></details>}
         <Field label="Extra guidance (files, constraints, expected behaviour)"><textarea rows={3} value={s.notes} onChange={(e) => s.set({ notes: e.target.value })} disabled={running} className={`${input} py-2`} /></Field>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-3 gap-4">
           <Field label="Test command"><input value={s.testCommand} onChange={(e) => s.set({ testCommand: e.target.value })} disabled={running} className={`${input} h-9 font-mono text-xs`} placeholder="npm test" /></Field>
+          <Field label="Step limit"><input type="number" min={5} max={100} value={s.stepLimit} onChange={(e) => s.set({ stepLimit: Math.max(5, Math.min(100, Number(e.target.value) || 30)) })} disabled={running} className={`${input} h-9 text-xs`} /></Field>
           <Field label="Branch"><input value={s.branch} onChange={(e) => s.set({ branch: e.target.value })} disabled={running} className={`${input} h-9 font-mono text-xs`} placeholder="sakai/fix" /></Field>
         </div>
 
+        <p className="-mt-2 text-[11px] text-muted">Step limit = the most model calls Sakai may make before stopping (a cost safety cap; a step is one model call). Typical fixes take 10–25.</p>
+        {llm && isSmallModel(llm.model) && <p className="text-[12px] text-sakai border border-line rounded-md px-3 py-2">{llm.model} is too small to drive an agent reliably and will likely get stuck. Use a 7B+ coder model or a hosted model (Groq, DeepSeek, Qwen).</p>}
         {s.estimate && <div ref={estRef}><EstimateCard e={s.estimate} provider={llm!.provider} model={llm!.model} /></div>}
         {err && <p className="text-sakai text-xs whitespace-pre-wrap">{err}</p>}
 
@@ -144,6 +147,8 @@ export function TaskPanel() {
                 <div key={i} className="text-fg whitespace-pre-wrap">{e.data.replace(/```json[\s\S]*?```/g, '').trim().slice(0, 600)}</div>
               ) : e.type === 'tool' ? (
                 <details key={i} className="border-l-2 border-line pl-3"><summary className="cursor-pointer text-muted">{e.data.call.tool} <span className="text-fg">{e.data.call.args.command ?? e.data.call.args.path ?? e.data.call.args.pattern ?? ''}</span></summary><pre className="mt-1 whitespace-pre-wrap text-muted max-h-48 overflow-auto">{e.data.out}</pre></details>
+              ) : e.type === 'status' && /Invalid|retry/i.test(e.data) ? (
+                <div key={i} className="text-sakai">{e.data}</div>
               ) : null)}
               {running && <div className="text-muted">working…</div>}
             </div>

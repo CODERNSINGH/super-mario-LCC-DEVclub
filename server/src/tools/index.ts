@@ -12,13 +12,19 @@ export const TOOL_DOCS = `Tools (reply with exactly ONE fenced json block per tu
 {"tool":"write_file","args":{"path":"...","content":"..."}}          create or overwrite a file
 {"tool":"finish","args":{"summary":"..."}}                           only after tests pass and diff is reviewed`
 
+/** Models often cite paths as `src/a.js#L10`, `src/a.js:10` or `./src/a.js` — normalise to a real path. */
+export function cleanPath(p: string | undefined): string | undefined {
+  return p?.trim().replace(/^\.\//, '').replace(/#L?\d+(-L?\d+)?$/i, '').replace(/:\d+(-\d+)?$/, '')
+}
+
 const q = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`
 
 const ALIASES: Record<string, string> = { grep: 'search', read: 'read_file', cat: 'read_file', open: 'read_file', edit: 'replace', str_replace: 'replace', create_file: 'write_file', write: 'write_file', run: 'bash', shell: 'bash', sh: 'bash', ls: 'bash', done: 'finish' }
 
 export async function execute(root: string, rawCall: ToolCall): Promise<string> {
   const call = { ...rawCall, tool: ALIASES[rawCall.tool] ?? rawCall.tool }
-  const a = call.args ?? {}
+  const a = { ...(call.args ?? {}) }
+  if (a.path) a.path = cleanPath(a.path)!
   try {
     switch (call.tool) {
       case 'bash': {

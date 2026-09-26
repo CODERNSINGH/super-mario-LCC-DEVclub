@@ -13,7 +13,7 @@ interface Session {
   side: Side; panel: Panel; panelOpen: boolean; palette: boolean
   logs: string[]
   issues: Issue[]; picked: Issue | null
-  goal: string; notes: string; testCommand: string; branch: string
+  goal: string; notes: string; testCommand: string; branch: string; stepLimit: number
   estimate: Estimate | null; phase: Phase
   events: AgentEvent[]; usage: { inputTokens: number; outputTokens: number; steps: number }
   summary: string; changed: string[]; pr: { url: string; number: number } | null
@@ -27,7 +27,7 @@ export const useSession = create<Session>((set) => ({
   tabs: [{ id: 'task', kind: 'task', title: 'Task' }], active: 'task', dirty: {}, termId: 0,
   side: 'issues', panel: 'logs', panelOpen: true, palette: false,
   logs: [], issues: [], picked: null,
-  goal: '', notes: '', testCommand: '', branch: '',
+  goal: '', notes: '', testCommand: '', branch: '', stepLimit: 30,
   estimate: null, phase: 'idle', events: [], usage: { inputTokens: 0, outputTokens: 0, steps: 0 },
   summary: '', changed: [], pr: null,
   set: (p) => set(p),

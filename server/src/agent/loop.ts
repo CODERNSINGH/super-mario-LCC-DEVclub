@@ -42,9 +42,9 @@ export async function runAgent(o: RunOptions): Promise<RunResult> {
       content: `# Issue${o.issue.number ? ` #${o.issue.number}` : ''}: ${o.issue.title}\n\n${o.issue.body || '(no description)'}\n\n${o.notes ? `# Guidance from the user\n${o.notes}\n\n` : ''}# Test command\n${testCmd}\n\n# Repository files\n${map}\n\nBegin with step 1. Reply with one tool call.`,
     },
   ]
-  let inT = 0, outT = 0, ranTests = false, reviewed = false, badFormat = 0
+  let inT = 0, outT = 0, ranTests = false, reviewed = false, badFormat = 0, totalBad = 0
   const seen = new Map<string, number>()
-  const max = o.maxSteps ?? 45
+  const max = o.maxSteps ?? 30
 
   for (let step = 1; step <= max; step++) {
     if (o.signal?.aborted) return { finished: false, summary: 'Cancelled', inputTokens: inT, outputTokens: outT, steps: step - 1 }
@@ -55,8 +55,9 @@ export async function runAgent(o: RunOptions): Promise<RunResult> {
     } catch (e) {
       if (!(e instanceof ToolCallRejected)) throw e
       // The model tried a tool we don't offer (e.g. gpt-oss "repo_browser.*"). Correct it and retry.
-      if (++badFormat >= 4) return { finished: false, summary: 'Model repeatedly called tools that do not exist', inputTokens: inT, outputTokens: outT, steps: step }
-      o.onEvent({ type: 'status', data: 'Model used an unknown tool; retrying' })
+      totalBad++
+      if (++badFormat >= 4 || totalBad >= 8) return { finished: false, summary: 'Stopped: the model keeps calling tools that do not exist. Use a stronger model (see the model warning).', inputTokens: inT, outputTokens: outT, steps: step }
+      o.onEvent({ type: 'status', data: `Invalid tool call (${badFormat}/4) — asking the model to retry` })
       messages.push({ role: 'user', content: `That tool does not exist (you tried: ${e.failedGeneration.slice(0, 160)}). Use ONLY these tools: bash, search, read_file, replace, write_file, finish. To list files use bash with "git ls-files | head -100".` })
       continue
     }
@@ -69,7 +70,9 @@ export async function runAgent(o: RunOptions): Promise<RunResult> {
 
     const call = nativeCall ?? parseToolCall(r.text)
     if (!call) {
-      if (++badFormat >= 4) return { finished: false, summary: 'Model repeatedly failed to produce valid tool calls', inputTokens: inT, outputTokens: outT, steps: step }
+      totalBad++
+      if (++badFormat >= 4 || totalBad >= 8) return { finished: false, summary: 'Stopped: the model cannot produce valid tool calls. Use a stronger model — small local models (≤3B) are not reliable agents.', inputTokens: inT, outputTokens: outT, steps: step }
+      o.onEvent({ type: 'status', data: `Invalid tool call (${badFormat}/4) — asking the model to retry` })
       messages.push({ role: 'user', content: `Invalid format. Reply with exactly ONE tool call as valid JSON inside a \`\`\`json block, nothing else. Example:\n\`\`\`json\n{"tool":"search","args":{"pattern":"function sum"}}\n\`\`\`\n${TOOL_DOCS}` })
       continue
     }
@@ -96,7 +99,8 @@ export async function runAgent(o: RunOptions): Promise<RunResult> {
     seen.set(key, n)
     let out = await execute(o.root, call)
     if (isTestCmd(call, testCmd)) ranTests = true
-    if (call.tool !== 'read_file' && call.tool !== 'search' && n >= 3) out += '\n[Sakai: you have repeated this exact call 3 times. Change approach.]'
+    if (n >= 3) out += `\n[Sakai: you have repeated this exact call ${n} times with the same result. Do something different: read another file, edit, or run the tests.]`
+    if (n >= 5) return { finished: false, summary: 'Stopped: the model is stuck repeating the same action. Try a stronger model or add guidance naming the file and the fix.', inputTokens: inT, outputTokens: outT, steps: step }
     if (call.tool === 'replace' || call.tool === 'write_file') reviewed = false
     o.onEvent({ type: 'tool', data: { call, out } })
     messages.push({ role: 'user', content: out })

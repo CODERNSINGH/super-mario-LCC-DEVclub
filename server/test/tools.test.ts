@@ -33,3 +33,10 @@ test('replace requires a unique match', async () => {
   assert.equal(await execute(root, { tool: 'replace', args: { path: 'f.txt', old: 'b', new: 'c' } }), 'OK')
   assert.equal(readFileSync(join(root, 'f.txt'), 'utf8'), 'a a c')
 })
+
+test('cleanPath strips line suffixes and ./', async () => {
+  const { cleanPath } = await import('../src/tools/index.js')
+  assert.equal(cleanPath('src/calculator.js#L10'), 'src/calculator.js')
+  assert.equal(cleanPath('./src/a.ts:42'), 'src/a.ts')
+  assert.equal(cleanPath('src/a.ts#L3-L9'), 'src/a.ts')
+})

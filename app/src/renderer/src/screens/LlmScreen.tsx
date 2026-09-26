@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useApp } from '../store'
 import { Button, Card, Steps } from '../components/ui'
+import { isSmallModel } from '../lib/api'
 
 /** Live model list minus non-chat models; curated defaults come first. Falls back to the curated list. */
 const NON_CHAT = /whisper|tts|guard|embed|transcri|orpheus|playai|moderation|safeguard/i
@@ -71,6 +72,7 @@ export function LlmScreen() {
           )}
           {!sel.needsKey && testing && <p className="text-xs text-muted">Looking for {sel.name}…</p>}
           {status && <p className={`text-xs ${status.ok ? 'text-fg' : 'text-sakai'}`}>{status.ok ? '● ' : '○ '}{status.message}</p>}
+          {status?.ok && isSmallModel(model) && <p className="text-xs text-sakai">Heads up: {model} is very small. Agents need a 7B+ coder model (e.g. qwen2.5-coder:7b) or a hosted model to work reliably.</p>}
           {status?.ok && (
             <select value={model} onChange={(e) => setModel(e.target.value)} className="w-full h-9 px-2 rounded-md bg-bg border border-line text-xs text-ink outline-none">
               {modelOptions.map((m) => <option key={m}>{m}</option>)}

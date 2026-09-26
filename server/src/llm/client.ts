@@ -21,7 +21,17 @@ export const NATIVE_TOOLS = [
 ]
 
 /** Provider-agnostic chat completion. Text-in/text-out: tool calls are parsed from the reply (works on every model). */
-export async function complete(cfg: LlmConfig, messages: Message[], signal?: AbortSignal): Promise<Completion> {
+export async function complete(cfg: LlmConfig, messages: Message[], userSignal?: AbortSignal): Promise<Completion> {
+  // Never hang: every model call has a hard timeout in addition to the user's Stop button.
+  const timeout = AbortSignal.timeout(180_000)
+  const signal = userSignal ? AbortSignal.any([userSignal, timeout]) : timeout
+  try { return await completeInner(cfg, messages, signal) } catch (e) {
+    if (timeout.aborted && !userSignal?.aborted) throw new Error('The model did not respond within 3 minutes. Check that the provider is reachable and the model is loaded.')
+    throw e
+  }
+}
+
+async function completeInner(cfg: LlmConfig, messages: Message[], signal: AbortSignal): Promise<Completion> {
   const base = cfg.baseUrl.replace(/\/$/, '')
   if (cfg.kind === 'anthropic') {
     const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n')

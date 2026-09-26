@@ -33,9 +33,19 @@ export function registerRepoIpc(getSecret: (k: string) => string | null): void {
         const dirty = (await git(dest, ['status', '--porcelain'])).out.trim()
         if (dirty) log('! Uncommitted changes present — leaving your working tree untouched')
         else {
-          log('$ git pull --ff-only')
-          const r = await git(dest, [...auth, 'pull', '--ff-only'], log)
-          if (r.code !== 0) log('! Could not fast-forward — continuing with the local copy')
+          // Start from the default branch: leftover Sakai branches (no upstream) are switched away from, never deleted.
+          const head = (await git(dest, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])).out.trim().replace('origin/', '') || 'main'
+          const cur = (await git(dest, ['rev-parse', '--abbrev-ref', 'HEAD'])).out.trim()
+          if (cur !== head) {
+            log(`$ git checkout ${head}   (was on ${cur})`)
+            await git(dest, ['checkout', head], log)
+          }
+          const up = await git(dest, ['rev-parse', '--abbrev-ref', '@{u}'])
+          if (up.code === 0) {
+            log('$ git pull --ff-only')
+            const r = await git(dest, [...auth, 'pull', '--ff-only'], log)
+            if (r.code !== 0) log('! Could not fast-forward — continuing with the local copy')
+          }
         }
         return dest
       }

@@ -50,3 +50,6 @@ export async function streamRun(body: unknown, onEvent: (e: AgentEvent) => void,
 
 /** Strips Electron's IPC wrapper from error messages. */
 export const cleanErr = (e: unknown): string => (e instanceof Error ? e.message : String(e)).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')
+
+/** Models this small cannot reliably follow an agent tool protocol. */
+export const isSmallModel = (m: string): boolean => /(^|[:\-_/ ])(0\.5|1|1\.5|2|3)b\b/i.test(m)
