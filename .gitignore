@@ -1,0 +1,15 @@
+node_modules/
+dist/
+out/
+release/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+.vite/
+coverage/
+.sakai/
+
+# Internal vibe-code working notes (handoff docs, kept local)
+vibe-code/

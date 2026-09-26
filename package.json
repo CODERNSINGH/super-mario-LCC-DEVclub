@@ -1,0 +1,20 @@
+{
+  "name": "sakai",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Sakai \u2014 an autonomous AI coding-agent harness for GitHub issues",
+  "workspaces": [
+    "app",
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "npm run build -w server && npm run dev -w app",
+    "dev:server": "npm run dev -w server",
+    "dev:web": "npm run dev -w web",
+    "build": "npm run build -ws --if-present",
+    "typecheck": "npm run typecheck -ws --if-present",
+    "dist": "npm run build -w server && npm run dist -w app",
+    "issues": "bash scripts/list-issues.sh"
+  }
+}
