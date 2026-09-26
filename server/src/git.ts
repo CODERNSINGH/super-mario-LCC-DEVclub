@@ -21,30 +21,74 @@ export async function createBranch(root: string, name: string): Promise<void> {
   await simpleGit(root).checkoutLocalBranch(name)
 }
 
-export interface PrInput { root: string; repo: string; token: string; branch: string; title: string; body: string; base?: string }
+export interface PrInput { root: string; repo: string; token?: string | null; branch: string; title: string; body: string; base?: string }
 
-export async function commitPushPr(i: PrInput): Promise<{ url: string; number: number }> {
+export async function commitPushPr(i: PrInput): Promise<{ url: string; number?: number }> {
   const g = simpleGit(i.root)
   const files = await changedFiles(i.root)
-  if (!files.length) throw new Error('No changes to commit')
   const branches = await g.branchLocal()
-  if (branches.current !== i.branch) await g.checkoutLocalBranch(i.branch).catch(() => g.checkout(i.branch))
-  await g.add('.')
-  await g.commit(`${i.title}\n\nCo-authored by Sakai`)
-  await g.raw(['-c', authed(i.token), 'push', '-u', 'origin', i.branch])
 
-  const base = i.base ?? (await defaultBranch(i.repo, i.token))
-  const res = await fetch(`https://api.github.com/repos/${i.repo}/pulls`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${i.token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: i.title, body: i.body, head: i.branch, base }),
-  })
-  if (!res.ok) throw new Error(`GitHub PR creation failed (${res.status}): ${await res.text()}`)
-  const pr = (await res.json()) as { html_url: string; number: number }
-  return { url: pr.html_url, number: pr.number }
-}
+  if (branches.current !== i.branch) {
+    await g.checkoutLocalBranch(i.branch).catch(() => g.checkout(i.branch))
+  }
 
-async function defaultBranch(repo: string, token: string): Promise<string> {
-  const r = await fetch(`https://api.github.com/repos/${repo}`, { headers: { Authorization: `Bearer ${token}` } })
-  return ((await r.json()) as { default_branch: string }).default_branch
+  if (files.length > 0) {
+    await g.add('.')
+    await g.commit(`${i.title}\n\nCo-authored by Sakai`)
+  }
+
+  // Push branch to origin. If token auth fails, fall back to default git credentials.
+  const token = (i.token ?? '').trim()
+  try {
+    const authArgs = token ? ['-c', authed(token)] : []
+    await g.raw([...authArgs, 'push', '-u', 'origin', i.branch])
+  } catch (pushErr) {
+    if (token) {
+      await g.raw(['push', '-u', 'origin', i.branch])
+    } else {
+      throw pushErr
+    }
+  }
+
+  // Determine base branch
+  let base = i.base
+  if (!base) {
+    try {
+      const sym = (await g.raw(['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'])).trim().replace('origin/', '')
+      if (sym) base = sym
+    } catch { /* ignore */ }
+  }
+  if (!base) base = 'main'
+
+  // If token is available, attempt to create the PR via the GitHub REST API
+  if (token) {
+    try {
+      const res = await fetch(`https://api.github.com/repos/${i.repo}/pulls`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: i.title, body: i.body, head: i.branch, base }),
+      })
+      if (res.ok) {
+        const pr = (await res.json()) as { html_url: string; number: number }
+        return { url: pr.html_url, number: pr.number }
+      }
+
+      // Check if a PR already exists for this branch
+      const errText = await res.text()
+      if (res.status === 422 && /pull request already exists/i.test(errText)) {
+        const owner = i.repo.split('/')[0]
+        const listRes = await fetch(`https://api.github.com/repos/${i.repo}/pulls?head=${encodeURIComponent(`${owner}:${i.branch}`)}`, {
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' }
+        })
+        if (listRes.ok) {
+          const list = (await listRes.json()) as { html_url: string; number: number }[]
+          if (list.length > 0) return { url: list[0].html_url, number: list[0].number }
+        }
+      }
+    } catch { /* fallback to web URL */ }
+  }
+
+  // Fallback to GitHub compare / new PR web URL
+  const url = `https://github.com/${i.repo}/pull/new/${encodeURIComponent(i.branch)}`
+  return { url }
 }

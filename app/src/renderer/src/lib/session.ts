@@ -16,7 +16,7 @@ interface Session {
   goal: string; notes: string; testCommand: string; branch: string; stepLimit: number
   estimate: Estimate | null; phase: Phase
   events: AgentEvent[]; usage: { inputTokens: number; outputTokens: number; steps: number }
-  summary: string; changed: string[]; pr: { url: string; number: number } | null
+  summary: string; changed: string[]; pr: { url: string; number?: number } | null
   set: (p: Partial<Session>) => void
   log: (l: string) => void
   openTab: (t: Tab) => void

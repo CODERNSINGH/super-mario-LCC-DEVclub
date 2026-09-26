@@ -12,7 +12,7 @@ export interface ProviderDef {
 }
 
 export const PROVIDERS: ProviderDef[] = [
-  { id: 'groq', name: 'Groq', kind: 'openai', baseUrl: 'https://api.groq.com/openai/v1', needsKey: true, models: ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'llama-3.3-70b-versatile', 'qwen/qwen3-32b'], note: 'Fast free tier — good for trying Sakai.' },
+  { id: 'groq', name: 'Groq', kind: 'openai', baseUrl: 'https://api.groq.com/openai/v1', needsKey: true, models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3-32b'], note: 'Fast free tier. Recommended: llama-3.3-70b-versatile.' },
   { id: 'deepseek', name: 'DeepSeek', kind: 'openai', baseUrl: 'https://api.deepseek.com/v1', needsKey: true, models: ['deepseek-chat', 'deepseek-reasoner'] },
   { id: 'qwen', name: 'Qwen (DashScope)', kind: 'openai', baseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1', needsKey: true, models: ['qwen3-coder-plus', 'qwen-max'] },
   { id: 'openai', name: 'OpenAI', kind: 'openai', baseUrl: 'https://api.openai.com/v1', needsKey: true, models: ['gpt-4.1', 'gpt-4.1-mini'] },

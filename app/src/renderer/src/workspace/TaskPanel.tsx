@@ -99,9 +99,15 @@ export function TaskPanel() {
     try {
       const token = await window.sakai.github.token()
       const body = `${s.summary}\n\n${s.picked ? `Closes #${s.picked.number}\n\n` : ''}---\nResolved autonomously by Sakai (${llm!.provider}/${llm!.model}). Steps: ${s.usage.steps}, tokens: ${s.usage.inputTokens + s.usage.outputTokens}.`
-      const pr = await post<{ url: string; number: number }>('/git/pr', { root: localPath, repo, token, branch: s.branch || `sakai/${Date.now()}`, title: s.picked ? `Fix #${s.picked.number}: ${s.picked.title}` : s.goal.slice(0, 70), body })
-      s.set({ pr }); s.log(`✓ Pull request #${pr.number} opened: ${pr.url}`)
-    } catch (e) { setErr(cleanErr(e)) } finally { setBusy(false) }
+      const pr = await post<{ url: string; number?: number }>('/git/pr', { root: localPath, repo, token, branch: s.branch || `sakai/${Date.now()}`, title: s.picked ? `Fix #${s.picked.number}: ${s.picked.title}` : s.goal.slice(0, 70), body })
+      s.set({ pr })
+      s.log(pr.number ? `✓ Pull request #${pr.number} opened: ${pr.url}` : `✓ Branch pushed. Create PR: ${pr.url}`)
+      window.open(pr.url, '_blank')
+    } catch (e) {
+      const msg = cleanErr(e)
+      setErr(msg)
+      s.log(`✗ Failed to create PR: ${msg}`)
+    } finally { setBusy(false) }
   }
 
   async function discard() {
@@ -164,9 +170,18 @@ export function TaskPanel() {
                 {s.changed.map((f) => <button key={f} onClick={() => useSession.getState().openTab({ id: `diff:${f}`, kind: 'diff', title: `${f.split('/').pop()} (diff)`, path: f })} className="font-mono text-[11px] px-2 h-6 rounded border border-line hover:border-sakai">{f}</button>)}
               </div>
             )}
-            <div className="mt-4 flex gap-2 items-center">
-              {s.pr ? <a href={s.pr.url} target="_blank" className="text-sakai underline">Open pull request #{s.pr.number}</a> : <Button disabled={busy || !s.changed.length} onClick={createPr}>{busy ? 'Opening PR…' : 'Create pull request'}</Button>}
-              <Button variant="ghost" disabled={!s.changed.length} onClick={discard}>Discard changes</Button>
+            <div className="mt-4 space-y-2">
+              <div className="flex gap-2 items-center">
+                {s.pr ? (
+                  <a href={s.pr.url} target="_blank" rel="noreferrer" className="text-sakai underline text-sm font-medium">
+                    {s.pr.number ? `Open pull request #${s.pr.number} ↗` : 'Open pull request on GitHub ↗'}
+                  </a>
+                ) : (
+                  <Button disabled={busy} onClick={createPr}>{busy ? 'Opening PR…' : 'Create pull request'}</Button>
+                )}
+                <Button variant="ghost" disabled={busy} onClick={discard}>Discard changes</Button>
+              </div>
+              {err && <p className="text-sakai text-xs whitespace-pre-wrap">{err}</p>}
             </div>
           </Card>
         )}

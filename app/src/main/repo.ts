@@ -12,16 +12,17 @@ export function parseRepo(input: string): string | null {
 export function registerRepoIpc(getSecret: (k: string) => string | null): void {
   ipcMain.handle('repo:parse', (_e, input: string) => parseRepo(input))
 
-  // Clones (or reuses) the repo using the user's OAuth token; streams logs to the renderer.
+  // Clones (or reuses) the repo using the user's OAuth/PAT token if available; supports public repos without token.
   ipcMain.handle('repo:clone', async (e, repo: string) => {
     const token = getSecret('github')
-    if (!token) throw new Error('Not signed in')
     const root = join(app.getPath('home'), 'Sakai')
     mkdirSync(root, { recursive: true })
     const win = BrowserWindow.fromWebContents(e.sender)
     const log = (line: string) => win?.webContents.send('repo:log', line)
     const url = `https://github.com/${repo}.git`
-    const auth = ['-c', `http.extraheader=Authorization: Basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`]
+    const auth = token
+      ? ['-c', `http.extraheader=Authorization: Basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`]
+      : []
 
     let dest = join(root, repo.replace('/', '__'))
     if (existsSync(dest)) {

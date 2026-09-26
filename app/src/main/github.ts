@@ -1,7 +1,20 @@
 import { shell } from 'electron'
 
 declare const __GITHUB_CLIENT_ID__: string
-const clientId = () => process.env.SAKAI_GITHUB_CLIENT_ID || __GITHUB_CLIENT_ID__
+let runtimeClientId = ''
+
+export function setClientId(id: string): void {
+  runtimeClientId = id.trim()
+}
+
+export function getClientId(): string {
+  return runtimeClientId || process.env.SAKAI_GITHUB_CLIENT_ID || (typeof __GITHUB_CLIENT_ID__ !== 'undefined' ? __GITHUB_CLIENT_ID__ : '')
+}
+
+export function hasOAuthConfig(): boolean {
+  return Boolean(getClientId())
+}
+
 const SCOPES = 'repo read:user user:email workflow'
 
 export interface DeviceCode {
@@ -15,13 +28,22 @@ export interface DeviceCode {
 const json = { Accept: 'application/json', 'Content-Type': 'application/json' }
 
 export async function startDeviceFlow(): Promise<DeviceCode> {
-  if (!clientId()) throw new Error('GitHub sign-in is not configured in this build. Please contact the app publisher.')
+  const id = getClientId()
+  if (!id) {
+    throw new Error('GitHub OAuth is not configured. Please enter your OAuth Client ID or connect using a Personal Access Token.')
+  }
   const res = await fetch('https://github.com/login/device/code', {
     method: 'POST',
     headers: json,
-    body: JSON.stringify({ client_id: clientId(), scope: SCOPES }),
+    body: JSON.stringify({ client_id: id, scope: SCOPES }),
   })
-  if (!res.ok) throw new Error(`GitHub device code request failed (${res.status})`)
+  if (!res.ok) {
+    if (res.status === 404) {
+      throw new Error('Invalid GitHub OAuth Client ID or Device Flow is not enabled for this OAuth App. Switch to the "Personal Access Token" tab to connect instantly.')
+    }
+    const errText = await res.text().catch(() => '')
+    throw new Error(`GitHub device code request failed (${res.status}): ${errText}`)
+  }
   const data = (await res.json()) as DeviceCode
   await shell.openExternal(data.verification_uri)
   return data
@@ -37,7 +59,7 @@ export async function pollDeviceFlow(code: DeviceCode): Promise<string> {
       method: 'POST',
       headers: json,
       body: JSON.stringify({
-        client_id: clientId(),
+        client_id: getClientId(),
         device_code: code.device_code,
         grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
       }),
@@ -52,17 +74,30 @@ export async function pollDeviceFlow(code: DeviceCode): Promise<string> {
 
 export async function fetchUser(token: string) {
   const res = await fetch('https://api.github.com/user', {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
+    headers: { Authorization: `Bearer ${token.trim()}`, Accept: 'application/vnd.github+json' },
   })
-  if (!res.ok) throw new Error('Token rejected by GitHub')
+  if (!res.ok) {
+    if (res.status === 401) throw new Error('Invalid GitHub token (401 Unauthorized)')
+    throw new Error(`GitHub user request failed (${res.status})`)
+  }
   return (await res.json()) as { login: string; name: string | null; avatar_url: string }
 }
 
-export async function listIssues(token: string, repo: string) {
+export async function listIssues(token: string | null, repo: string) {
+  const headers: Record<string, string> = { Accept: 'application/vnd.github+json' }
+  if (token) headers['Authorization'] = `Bearer ${token.trim()}`
   const res = await fetch(`https://api.github.com/repos/${repo}/issues?state=open&per_page=50`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
+    headers,
   })
-  if (!res.ok) throw new Error(`Could not list issues (${res.status})`)
+  if (!res.ok) {
+    if (res.status === 403) {
+      throw new Error('GitHub API rate limit reached (403). Connect your GitHub account with a Personal Access Token in Settings to get 5,000 req/hr.')
+    }
+    if (res.status === 404) {
+      throw new Error(`Repository "${repo}" not found or private (404). Please connect your GitHub account in Settings.`)
+    }
+    throw new Error(`Could not list issues (${res.status})`)
+  }
   const items = (await res.json()) as Array<{ number: number; title: string; body: string | null; labels: { name: string }[]; pull_request?: unknown }>
   return items.filter((i) => !i.pull_request).map((i) => ({ number: i.number, title: i.title, body: i.body ?? '', labels: i.labels.map((l) => l.name) }))
 }

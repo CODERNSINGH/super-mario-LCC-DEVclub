@@ -6,6 +6,10 @@ const api = {
   github: {
     start: () => invoke<{ device_code: string; user_code: string; verification_uri: string; interval: number; expires_in: number }>('github:start'),
     poll: (code: unknown) => invoke<{ login: string; name: string | null; avatar_url: string }>('github:poll', code),
+    loginWithToken: (token: string) => invoke<{ login: string; name: string | null; avatar_url: string }>('github:token-login', token),
+    hasOAuth: () => invoke<boolean>('github:has-oauth'),
+    getClientId: () => invoke<string>('github:get-client-id'),
+    setClientId: (id: string) => invoke<boolean>('github:set-client-id', id),
     user: () => invoke<{ login: string; name: string | null; avatar_url: string } | null>('github:user'),
     token: () => invoke<string | null>('github:token'),
     signOut: () => invoke<void>('github:signout'),

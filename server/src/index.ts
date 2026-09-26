@@ -11,7 +11,10 @@ const app = express()
 app.use(cors(), express.json({ limit: '4mb' }))
 
 const wrap = (fn: express.RequestHandler): express.RequestHandler => async (req, res, next) => {
-  try { await fn(req, res, next) } catch (e) { res.status(500).json({ error: (e as Error).message }) }
+  try { await fn(req, res, next) } catch (e) {
+    console.error('[server error]', e)
+    res.status(500).json({ error: (e as Error).message })
+  }
 }
 
 app.get('/health', (_q, r) => { r.json({ ok: true }) })
