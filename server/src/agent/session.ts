@@ -10,6 +10,8 @@ export interface SessionInit {
   notes?: string
   testCommand?: string
   maxSteps?: number
+  /** Hard wall-clock limit per turn in minutes (default 8, clamped 3-15). */
+  timeLimitMin?: number
   /** Test seam: replace the model call. */
   deps?: Partial<SessionState['deps']>
 }
@@ -34,10 +36,12 @@ export class Session {
   private disposed = false
   private current: Promise<void> = Promise.resolve()
   private readonly maxSteps: number
+  private readonly timeLimitMs: number
 
   constructor(init: SessionInit) {
     this.mode = init.mode
     this.maxSteps = init.maxSteps ?? 30
+    this.timeLimitMs = Math.min(15, Math.max(3, init.timeLimitMin ?? 8)) * 60_000
     this.state = newState({ mode: init.mode, root: init.root, llm: init.llm, issue: init.issue, notes: init.notes, testCommand: init.testCommand, deps: init.deps })
   }
 
@@ -89,8 +93,11 @@ export class Session {
 
   private runTurn(kind: 'work' | 'followup' | 'chat', text?: string): void {
     this.running = true
-    this.ac = new AbortController()
-    const signal = this.ac.signal
+    const ac = new AbortController()
+    this.ac = ac
+    // Never run forever: user Stop OR the wall-clock deadline aborts the model call and the turn.
+    const deadline = AbortSignal.timeout(this.timeLimitMs)
+    const signal = AbortSignal.any([ac.signal, deadline])
     this.emit({ type: 'phase', data: 'running' })
     this.current = (async () => {
       try {
@@ -106,9 +113,10 @@ export class Session {
           maxSteps: this.maxSteps,
         }, kind)
         this.state.turn++
+        if (deadline.aborted && !ac.signal.aborted) result.summary = `Time limit reached (${this.timeLimitMs / 60_000} min) — stopped. Changes so far are kept; review the diff or send a message to continue.`
         this.emit({ type: 'done', data: result })
       } catch (e) {
-        if (signal.aborted) this.emit({ type: 'done', data: { finished: false, summary: 'Stopped by user', inputTokens: this.state.inT, outputTokens: this.state.outT, steps: 0 } })
+        if (signal.aborted) this.emit({ type: 'done', data: { finished: false, summary: deadline.aborted && !ac.signal.aborted ? `Time limit reached (${this.timeLimitMs / 60_000} min) — stopped.` : 'Stopped by user', inputTokens: this.state.inT, outputTokens: this.state.outT, steps: 0 } })
         else this.emit({ type: 'error', data: (e as Error).message })
         this.state.turn++
       } finally {

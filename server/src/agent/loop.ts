@@ -95,7 +95,7 @@ async function prepare(st: SessionState, io: TurnIO): Promise<void> {
   let baselineOut = ''
   if (st.hasTests) {
     io.emit({ type: 'status', data: 'Running baseline tests' })
-    const b = await runShell(st.root, `CI=1 ${st.testCmd}`, 180_000)
+    const b = await runShell(st.root, `CI=1 ${st.testCmd}`, 120_000)
     st.baseline = parseTestOutput(b.output, b.code)
     baselineOut = b.output
     io.emit({ type: 'tool', data: { call: { tool: 'baseline', args: { command: st.testCmd } }, out: `exit ${b.code}\n${failureExcerpt(b.output, 1500)}` } })
@@ -139,7 +139,7 @@ async function verify(st: SessionState, io: TurnIO): Promise<string> {
   let verdict: Verdict = 'unknown'
   if (st.hasTests) {
     io.emit({ type: 'status', data: 'Running tests' })
-    const t = await runShell(st.root, `CI=1 ${st.testCmd}`, 120_000)
+    const t = await runShell(st.root, `CI=1 ${st.testCmd}`, 90_000)
     const now = parseTestOutput(t.output, t.code)
     cmp = compareRuns(st.baseline ?? { exit: 0, failing: [], failedCount: 0, passedCount: null, unparsed: false }, now)
     parts.push(describeComparison(cmp, now))

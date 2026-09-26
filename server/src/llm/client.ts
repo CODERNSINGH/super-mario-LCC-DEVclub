@@ -40,7 +40,7 @@ export const READ_ONLY_TOOLS = NATIVE_TOOLS.filter((t) => ['bash', 'search', 're
 const chars = (m: Message[]) => m.reduce((n, x) => n + x.content.length, 0)
 
 /** Idle-based timeout: a slow model may take long to start, but a stalled stream is aborted. */
-function guard(user?: AbortSignal, firstMs = 180_000, idleMs = 120_000) {
+function guard(user?: AbortSignal, firstMs = 120_000, idleMs = 75_000) {
   const ac = new AbortController()
   let timedOut = false
   let t: ReturnType<typeof setTimeout>
@@ -165,7 +165,7 @@ export async function stream(cfg: LlmConfig, messages: Message[], h: StreamHandl
 
 /** Non-streaming completion (cost-estimate tips etc.). */
 export async function complete(cfg: LlmConfig, messages: Message[], userSignal?: AbortSignal): Promise<Completion> {
-  const g = guard(userSignal, 120_000, 120_000)
+  const g = guard(userSignal, 120_000, 75_000)
   const base = cfg.baseUrl.replace(/\/$/, '')
   try {
     if (cfg.kind === 'anthropic') {

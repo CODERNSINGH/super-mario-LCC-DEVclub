@@ -4,13 +4,13 @@ import { trackedFiles, detectTestCommand } from './repo/info.js'
 /** Approximate public list prices, USD per 1M tokens [input, output]. Local models are free. */
 const PRICES: Record<string, [number, number]> = {
   'deepseek-chat': [0.27, 1.1], 'deepseek-reasoner': [0.55, 2.19],
-  'qwen3-coder-plus': [1.0, 5.0], 'qwen-max': [1.6, 6.4],
+  'qwen3-coder-plus': [1.0, 5.0], 'qwen3-coder-flash': [0.3, 1.5], 'qwen3-max': [1.2, 6.0], 'qwen-plus': [0.4, 1.2], 'qwen-max': [1.6, 6.4],
   'gpt-4.1': [2, 8], 'gpt-4.1-mini': [0.4, 1.6],
   'claude-sonnet-5': [3, 15], 'claude-haiku-4-5-20251001': [1, 5],
   'openai/gpt-oss-120b': [0.15, 0.75], 'openai/gpt-oss-20b': [0.075, 0.3], 'llama-3.3-70b-versatile': [0.59, 0.79], 'qwen/qwen3-32b': [0.29, 0.59],
 }
 /** Approximate generation speed (tokens/sec) used only for time estimates. */
-const SPEED: Record<string, number> = { groq: 300, deepseek: 45, qwen: 55, openai: 80, anthropic: 70, ollama: 25, lmstudio: 25 }
+const SPEED: Record<string, number> = { groq: 300, deepseek: 45, qwen: 55, 'qwen-cn': 55, openai: 80, anthropic: 70, ollama: 25, lmstudio: 25 }
 
 export interface Estimate {
   repoTokens: number; steps: number; inputTokens: number; outputTokens: number

@@ -13,8 +13,9 @@ export interface ProviderDef {
 
 export const PROVIDERS: ProviderDef[] = [
   { id: 'groq', name: 'Groq', kind: 'openai', baseUrl: 'https://api.groq.com/openai/v1', needsKey: true, models: ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'llama-3.3-70b-versatile', 'qwen/qwen3-32b'], note: 'Fast free tier — good for trying Sakai.' },
-  { id: 'deepseek', name: 'DeepSeek', kind: 'openai', baseUrl: 'https://api.deepseek.com/v1', needsKey: true, models: ['deepseek-chat', 'deepseek-reasoner'] },
-  { id: 'qwen', name: 'Qwen (DashScope)', kind: 'openai', baseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1', needsKey: true, models: ['qwen3-coder-plus', 'qwen-max'] },
+  { id: 'deepseek', name: 'DeepSeek', kind: 'openai', baseUrl: 'https://api.deepseek.com/v1', needsKey: true, models: ['deepseek-chat', 'deepseek-reasoner'], note: 'Direct DeepSeek API (api.deepseek.com) — no third-party gateway.' },
+  { id: 'qwen', name: 'Qwen (Alibaba Cloud, Intl)', kind: 'openai', baseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1', needsKey: true, models: ['qwen3-coder-plus', 'qwen3-coder-flash', 'qwen3-max', 'qwen-plus'], note: 'Direct Alibaba Cloud Model Studio API (dashscope-intl.aliyuncs.com). Use this for international keys.' },
+  { id: 'qwen-cn', name: 'Qwen (Alibaba Cloud, China)', kind: 'openai', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', needsKey: true, models: ['qwen3-coder-plus', 'qwen3-coder-flash', 'qwen3-max', 'qwen-plus'], note: 'Direct API (dashscope.aliyuncs.com). Qwen keys are region-specific: use this one for China-region keys.' },
   { id: 'openai', name: 'OpenAI', kind: 'openai', baseUrl: 'https://api.openai.com/v1', needsKey: true, models: ['gpt-4.1', 'gpt-4.1-mini'] },
   { id: 'anthropic', name: 'Anthropic', kind: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', needsKey: true, models: ['claude-sonnet-5', 'claude-haiku-4-5-20251001'] },
   { id: 'ollama', name: 'Ollama (local)', kind: 'ollama', baseUrl: 'http://localhost:11434', needsKey: false, models: [], note: 'Detected automatically if Ollama is running.' },
@@ -50,7 +51,7 @@ export async function testProvider(id: string, apiKey: string, baseUrl?: string)
   }
 }
 
-const ENV_KEYS: Record<string, string> = { groq: 'GROQ_API_KEY', deepseek: 'DEEPSEEK_API_KEY', qwen: 'DASHSCOPE_API_KEY', openai: 'OPENAI_API_KEY', anthropic: 'ANTHROPIC_API_KEY' }
+const ENV_KEYS: Record<string, string> = { groq: 'GROQ_API_KEY', deepseek: 'DEEPSEEK_API_KEY', qwen: 'DASHSCOPE_API_KEY', 'qwen-cn': 'DASHSCOPE_API_KEY', openai: 'OPENAI_API_KEY', anthropic: 'ANTHROPIC_API_KEY' }
 
 export function registerLlmIpc(): void {
   ipcMain.handle('llm:key', (_e, id: string) => getSecret(`llm:${id}`) || (ENV_KEYS[id] ? process.env[ENV_KEYS[id]] ?? '' : ''))

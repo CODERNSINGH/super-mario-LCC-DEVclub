@@ -46,12 +46,12 @@ const sseHeaders = (res: express.Response) => {
 }
 
 app.post('/session', wrap(async (q, r) => {
-  const { root, llm, mode, issue, notes, testCommand, maxSteps, text } = q.body ?? {}
+  const { root, llm, mode, issue, notes, testCommand, maxSteps, timeLimitMin, text } = q.body ?? {}
   if (!root || !existsSync(root) || !statSync(root).isDirectory()) { r.status(400).json({ error: 'root must be an existing directory' }); return }
   if (!llm?.baseUrl || !llm?.model) { r.status(400).json({ error: 'llm config (baseUrl, model) is required' }); return }
   const m = mode === 'chat' ? 'chat' : 'solve'
   if (m === 'solve' && !issue?.title) { r.status(400).json({ error: 'solve mode needs issue {title, body}' }); return }
-  const s = sessions.create({ root, llm, mode: m, issue, notes, testCommand, maxSteps })
+  const s = sessions.create({ root, llm, mode: m, issue, notes, testCommand, maxSteps, timeLimitMin })
   s.start(typeof text === 'string' ? text : undefined)
   r.json({ id: s.id })
 }))
@@ -86,8 +86,8 @@ app.delete('/session/:id', (q, r) => { r.json({ ok: sessions.delete(String(q.par
 // Legacy one-shot stream (eval scripts, older clients): a session that lives for a single solve turn.
 app.post('/run', async (req, res) => {
   sseHeaders(res)
-  const { root, llm, issue, notes, testCommand, maxSteps } = req.body
-  const s = sessions.create({ root, llm, mode: 'solve', issue, notes, testCommand, maxSteps })
+  const { root, llm, issue, notes, testCommand, maxSteps, timeLimitMin } = req.body
+  const s = sessions.create({ root, llm, mode: 'solve', issue, notes, testCommand, maxSteps, timeLimitMin })
   const HIDDEN = new Set(['token', 'thinking', 'phase', 'user'])
   const unsub = s.subscribe((e) => { if (!HIDDEN.has(e.type)) res.write(`data: ${JSON.stringify({ type: e.type, data: e.data })}\n\n`) })
   res.on('close', () => { s.stop(); unsub(); setTimeout(() => sessions.delete(s.id), 200) })
