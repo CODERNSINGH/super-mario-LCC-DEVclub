@@ -1,5 +1,6 @@
 import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'node:path'
+import { nativeImage } from 'electron'
 import { registerIpc } from './ipc'
 import { loadEnv } from './env'
 import { startServer, stopServer } from './server'
@@ -41,6 +42,8 @@ function createWindow(): void {
 loadEnv()
 
 app.whenReady().then(async () => {
+  // Packaged builds take the icon from build/icon.icns; in dev, set the Dock icon explicitly.
+  if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(nativeImage.createFromPath(join(__dirname, '../../build/icon.png')))
   registerIpc()
   await startServer()
   createWindow()

@@ -1,9 +1,11 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import logo from '../assets/logo.png'
 
 export function Logo({ size = 28 }: { size?: number }) {
   return (
     <div className="flex items-center gap-2.5">
-      <div style={{ width: size, height: size }} className="rounded-full bg-sakai grid place-items-center text-ink font-semibold">S</div>
+      {/* Transparent PNG (black backdrop converted to alpha) so it sits cleanly on the dark UI. */}
+      <img src={logo} width={size} height={size} alt="" className="select-none" draggable={false} />
       <span className="text-ink text-[15px] font-semibold tracking-wide">Sakai</span>
     </div>
   )

@@ -41,7 +41,8 @@
     "appId": "com.sakai.app",
     "productName": "Sakai",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "files": [
       "out/**",
@@ -62,7 +63,8 @@
         "dmg",
         "zip"
       ],
-      "hardenedRuntime": true
+      "hardenedRuntime": true,
+      "icon": "build/icon.icns"
     }
   }
 }

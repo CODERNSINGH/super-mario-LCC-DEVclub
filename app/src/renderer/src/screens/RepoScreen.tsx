@@ -15,8 +15,8 @@ export function RepoScreen() {
 
   return (
     <div>
-      <Logo size={36} />
-      <h1 className="mt-8 text-2xl text-ink font-semibold">Which repository should Sakai work on?</h1>
+      <Logo size={72} />
+      <h1 className="mt-4 text-2xl text-ink font-semibold">Which repository should Sakai work on?</h1>
       <p className="mt-2 text-muted">Paste a GitHub link. Sakai will clone it, read its open issues and solve the one you pick.</p>
       <div className="mt-6"><Steps current={0} /></div>
       <input
