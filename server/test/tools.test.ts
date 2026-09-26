@@ -107,3 +107,19 @@ test('two tool objects in one reply: only the first is used and no JSON leaks in
   const { execute } = await import('../src/tools/index.js')
   assert.match(await execute('/tmp', { tool: 'replace_lines', args: { path: 'a.js', start: '1', end: '1', new: 'x}\n{"tool":"finish"' } }), /contains tool-call JSON/)
 })
+
+test('ensureBranch never fails on a dirty tree and never reuses a stale branch', async () => {
+  const { execSync } = await import('node:child_process')
+  const { ensureBranch } = await import('../src/git.js')
+  const root = mkdtempSync(join(tmpdir(), 'sakai-git-'))
+  const sh = (c: string) => execSync(c, { cwd: root, stdio: 'ignore' })
+  sh('git init -q -b main && git config user.email a@b && git config user.name a')
+  writeFileSync(join(root, 'f.txt'), 'one'); sh('git add . && git commit -qm init')
+  // an old Sakai branch exists with different content for f.txt
+  sh('git checkout -qb sakai/fix'); writeFileSync(join(root, 'f.txt'), 'old fix'); sh('git commit -qam old'); sh('git checkout -q main')
+  writeFileSync(join(root, 'f.txt'), 'new local edit') // dirty tree that git would refuse to carry onto sakai/fix
+  const b = await ensureBranch(root, 'sakai/fix')
+  assert.equal(b, 'sakai/fix-2')
+  assert.equal(readFileSync(join(root, 'f.txt'), 'utf8'), 'new local edit')
+  assert.equal(await ensureBranch(root, 'sakai/fix'), 'sakai/fix-2') // idempotent for the same run
+})

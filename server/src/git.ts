@@ -17,8 +17,24 @@ export async function originalContent(root: string, rel: string): Promise<string
   return simpleGit(root).show([`HEAD:${rel}`]).catch(() => '')
 }
 
-export async function createBranch(root: string, name: string): Promise<void> {
-  await simpleGit(root).checkoutLocalBranch(name)
+/**
+ * Puts the working tree on `name` without ever failing on uncommitted changes.
+ * Never switches to a pre-existing branch (git refuses when files differ, and it may be stale from an earlier run):
+ * if the name is taken it creates `name-2`, `name-3`… with `checkout -b`, which carries local changes along.
+ * Returns the branch actually in use.
+ */
+export async function ensureBranch(root: string, name: string): Promise<string> {
+  const g = simpleGit(root)
+  const { current, all } = await g.branchLocal()
+  if (current === name || new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-\\d+$`).test(current)) return current
+  let actual = name
+  for (let n = 2; all.includes(actual); n++) actual = `${name}-${n}`
+  await g.checkoutLocalBranch(actual)
+  return actual
+}
+
+export async function createBranch(root: string, name: string): Promise<string> {
+  return ensureBranch(root, name)
 }
 
 export interface PrInput { author?: { name: string; email: string }; root: string; repo: string; token: string; branch: string; title: string; body: string; base?: string }
@@ -27,21 +43,20 @@ export async function commitPushPr(i: PrInput): Promise<{ url: string; number: n
   const g = simpleGit(i.root)
   const files = await changedFiles(i.root)
   if (!files.length) throw new Error('No changes to commit')
-  const branches = await g.branchLocal()
-  if (branches.current !== i.branch) await g.checkoutLocalBranch(i.branch).catch(() => g.checkout(i.branch))
+  const branch = await ensureBranch(i.root, i.branch)
   // Machines without a git identity would fail with "Please tell me who you are": fall back to the GitHub account.
   const hasName = (await g.getConfig('user.name')).value, hasEmail = (await g.getConfig('user.email')).value
   if (i.author && !hasName) await g.addConfig('user.name', i.author.name, false, 'local')
   if (i.author && !hasEmail) await g.addConfig('user.email', i.author.email, false, 'local')
   await g.add('.')
   await g.commit(i.title)
-  await g.raw(['-c', authed(i.token), 'push', '-u', 'origin', i.branch])
+  await g.raw(['-c', authed(i.token), 'push', '-u', 'origin', branch])
 
   const base = i.base ?? (await defaultBranch(i.repo, i.token))
   const res = await fetch(`https://api.github.com/repos/${i.repo}/pulls`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${i.token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: i.title, body: i.body, head: i.branch, base }),
+    body: JSON.stringify({ title: i.title, body: i.body, head: branch, base }),
   })
   if (!res.ok) throw new Error(`GitHub PR creation failed (${res.status}): ${await res.text()}`)
   const pr = (await res.json()) as { html_url: string; number: number }
@@ -60,10 +75,7 @@ export async function commitLocal(i: CommitInput): Promise<{ sha: string; branch
   const g = simpleGit(i.root)
   if (!(await g.checkIsRepo())) throw new Error('This folder is not a git repository')
   if (!(await changedFiles(i.root)).length) throw new Error('No changes to commit')
-  if (i.branch) {
-    const branches = await g.branchLocal()
-    if (branches.current !== i.branch) await (branches.all.includes(i.branch) ? g.checkout(i.branch) : g.checkoutLocalBranch(i.branch))
-  }
+  if (i.branch) await ensureBranch(i.root, i.branch)
   const hasName = (await g.getConfig('user.name')).value, hasEmail = (await g.getConfig('user.email')).value
   if (i.author && !hasName) await g.addConfig('user.name', i.author.name, false, 'local')
   if (i.author && !hasEmail) await g.addConfig('user.email', i.author.email, false, 'local')

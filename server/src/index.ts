@@ -29,7 +29,7 @@ app.post('/fs/write', wrap(async (q, r) => { await writeFile(safePath(q.body.roo
 app.post('/git/changes', wrap(async (q, r) => { r.json({ files: await changedFiles(q.body.root) }) }))
 app.post('/git/diff', wrap(async (q, r) => { r.json({ diff: await currentDiff(q.body.root) }) }))
 app.post('/git/original', wrap(async (q, r) => { r.json({ content: await originalContent(q.body.root, q.body.path) }) }))
-app.post('/git/branch', wrap(async (q, r) => { await createBranch(q.body.root, q.body.name); r.json({ ok: true }) }))
+app.post('/git/branch', wrap(async (q, r) => { r.json({ ok: true, branch: await createBranch(q.body.root, q.body.name) }) }))
 app.post('/git/reset', wrap(async (q, r) => { await runShell(q.body.root, 'git checkout -- . && git clean -fd'); r.json({ ok: true }) }))
 app.post('/git/pr', wrap(async (q, r) => { r.json(await commitPushPr(q.body)) }))
 
