@@ -61,3 +61,17 @@ export async function detectTestCommand(root: string): Promise<string | null> {
   if (has('Makefile')) return 'make test'
   return null
 }
+
+/** Installs project dependencies without touching manifests or lockfiles. Returns a log tail, or null if nothing to do. */
+export async function installDeps(root: string): Promise<string | null> {
+  const has = (f: string) => existsSync(join(root, f))
+  if (has('package.json') && !has('node_modules')) {
+    const cmd = has('pnpm-lock.yaml') ? 'pnpm install --frozen-lockfile'
+      : has('yarn.lock') ? 'yarn install --frozen-lockfile'
+      : has('package-lock.json') ? 'npm ci --no-audit --no-fund'
+      : 'npm install --no-package-lock --no-audit --no-fund'
+    const r = await runShell(root, cmd, 300_000)
+    return `$ ${cmd}\nexit ${r.code}\n${r.output.slice(-600)}`
+  }
+  return null
+}

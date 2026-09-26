@@ -14,6 +14,15 @@ export interface DeviceCode {
 
 const json = { Accept: 'application/json', 'Content-Type': 'application/json' }
 
+function friendly(code: string): string {
+  return ({
+    device_flow_disabled: 'Device Flow is not enabled for this GitHub OAuth app. Publisher: enable it in GitHub → Settings → Developer settings → OAuth Apps.',
+    incorrect_client_credentials: 'GitHub rejected the app’s Client ID. Please update Sakai or contact the publisher.',
+    access_denied: 'Authorization was cancelled on GitHub. Click Connect to try again.',
+    expired_token: 'The sign-in code expired. Click Connect to get a new one.',
+  } as Record<string, string>)[code] ?? `GitHub sign-in failed (${code}).`
+}
+
 export async function startDeviceFlow(): Promise<DeviceCode> {
   if (!clientId()) throw new Error('GitHub sign-in is not configured in this build. Please contact the app publisher.')
   const res = await fetch('https://github.com/login/device/code', {
@@ -22,7 +31,8 @@ export async function startDeviceFlow(): Promise<DeviceCode> {
     body: JSON.stringify({ client_id: clientId(), scope: SCOPES }),
   })
   if (!res.ok) throw new Error(`GitHub device code request failed (${res.status})`)
-  const data = (await res.json()) as DeviceCode
+  const data = (await res.json()) as DeviceCode & { error?: string }
+  if (data.error) throw new Error(friendly(data.error))
   await shell.openExternal(data.verification_uri)
   return data
 }
@@ -45,7 +55,7 @@ export async function pollDeviceFlow(code: DeviceCode): Promise<string> {
     const body = (await res.json()) as { access_token?: string; error?: string; interval?: number }
     if (body.access_token) return body.access_token
     if (body.error === 'slow_down') interval = body.interval ?? interval + 5
-    else if (body.error && body.error !== 'authorization_pending') throw new Error(body.error)
+    else if (body.error && body.error !== 'authorization_pending') throw new Error(friendly(body.error))
   }
   throw new Error('Device code expired')
 }
@@ -55,7 +65,7 @@ export async function fetchUser(token: string) {
     headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json' },
   })
   if (!res.ok) throw new Error('Token rejected by GitHub')
-  return (await res.json()) as { login: string; name: string | null; avatar_url: string }
+  return (await res.json()) as { id: number; login: string; name: string | null; avatar_url: string }
 }
 
 export async function listIssues(token: string, repo: string) {

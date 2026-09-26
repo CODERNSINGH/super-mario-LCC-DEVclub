@@ -1,6 +1,7 @@
 import { complete, ToolCallRejected, type LlmConfig, type Message } from '../llm/client.js'
-import { execute, parseToolCall, TOOL_DOCS, type ToolCall } from '../tools/index.js'
-import { repoMap, detectTestCommand } from '../repo/info.js'
+import { execute, parseProblem, parseToolCall, TOOL_DOCS, type ToolCall } from '../tools/index.js'
+import { repoMap, detectTestCommand, installDeps } from '../repo/info.js'
+import { runShell } from '../tools/shell.js'
 import { currentDiff } from '../git.js'
 import { SYSTEM_PROMPT } from './prompt.js'
 
@@ -35,11 +36,24 @@ function compact(messages: Message[]): Message[] {
 export async function runAgent(o: RunOptions): Promise<RunResult> {
   const testCmd = o.testCommand || (await detectTestCommand(o.root)) || 'unknown (find it in the repo)'
   const map = await repoMap(o.root)
+
+  // Prepare the environment like an engineer would: install deps, then run the tests once to see what is failing.
+  o.onEvent({ type: 'status', data: 'Preparing environment' })
+  const installLog = await installDeps(o.root)
+  if (installLog) o.onEvent({ type: 'tool', data: { call: { tool: 'setup', args: { command: installLog.split('\n')[0].slice(2) } }, out: installLog } })
+  let baseline = ''
+  if (o.testCommand || testCmd !== 'unknown (find it in the repo)') {
+    o.onEvent({ type: 'status', data: 'Running baseline tests' })
+    const b = await runShell(o.root, `CI=1 ${testCmd}`, 180_000)
+    const out = b.output.length > 4500 ? `${b.output.slice(0, 1200)}\n…\n${b.output.slice(-3000)}` : b.output
+    baseline = `\n\n# Baseline test run BEFORE any change (exit ${b.code})\n${out}`
+    o.onEvent({ type: 'tool', data: { call: { tool: 'baseline', args: { command: testCmd } }, out: `exit ${b.code}\n${out.slice(-1500)}` } })
+  }
   const messages: Message[] = [
     { role: 'system', content: SYSTEM_PROMPT },
     {
       role: 'user',
-      content: `# Issue${o.issue.number ? ` #${o.issue.number}` : ''}: ${o.issue.title}\n\n${o.issue.body || '(no description)'}\n\n${o.notes ? `# Guidance from the user\n${o.notes}\n\n` : ''}# Test command\n${testCmd}\n\n# Repository files\n${map}\n\nBegin with step 1. Reply with one tool call.`,
+      content: `# Issue${o.issue.number ? ` #${o.issue.number}` : ''}: ${o.issue.title}\n\n${o.issue.body || '(no description)'}\n\n${o.notes ? `# Guidance from the user\n${o.notes}\n\n` : ''}# Test command\n${testCmd}${baseline}\n\n# Repository files\n${map}\n\nDependencies are installed. Use the failing tests above to localize the bug, read the relevant source, then fix it. Reply with one tool call.`,
     },
   ]
   let inT = 0, outT = 0, ranTests = false, reviewed = false, badFormat = 0, totalBad = 0
@@ -73,7 +87,7 @@ export async function runAgent(o: RunOptions): Promise<RunResult> {
       totalBad++
       if (++badFormat >= 4 || totalBad >= 8) return { finished: false, summary: 'Stopped: the model cannot produce valid tool calls. Use a stronger model — small local models (≤3B) are not reliable agents.', inputTokens: inT, outputTokens: outT, steps: step }
       o.onEvent({ type: 'status', data: `Invalid tool call (${badFormat}/4) — asking the model to retry` })
-      messages.push({ role: 'user', content: `Invalid format. Reply with exactly ONE tool call as valid JSON inside a \`\`\`json block, nothing else. Example:\n\`\`\`json\n{"tool":"search","args":{"pattern":"function sum"}}\n\`\`\`\n${TOOL_DOCS}` })
+      messages.push({ role: 'user', content: `${parseProblem(r.text)} Reply with exactly ONE tool call as valid JSON inside a \`\`\`json block, nothing else. Example:\n\`\`\`json\n{"tool":"search","args":{"pattern":"function sum"}}\n\`\`\`\n${TOOL_DOCS}` })
       continue
     }
     badFormat = 0

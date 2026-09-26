@@ -17,6 +17,14 @@ export function cleanPath(p: string | undefined): string | undefined {
   return p?.trim().replace(/^\.\//, '').replace(/#L?\d+(-L?\d+)?$/i, '').replace(/:\d+(-\d+)?$/, '')
 }
 
+/** Commands the agent must never run: dependency changes (Sakai installs deps itself), git history/state changes, destructive deletes. */
+export function blockedCommand(cmd: string): string | null {
+  if (/\b(npm|pnpm|yarn|bun)\s+(i|install|add|remove|uninstall)\b.*(--save|--save-dev|-D|-S|--global|-g)\b|\b(yarn|pnpm|bun)\s+add\b/.test(cmd)) return 'Do not add or change dependencies. Dependencies are already installed by Sakai; only edit source or test files.'
+  if (/\bgit\s+(commit|push|reset|clean|checkout\s+--|stash|rebase|merge|branch\s+-D)\b/.test(cmd)) return 'Do not change git state. Sakai commits and pushes for you. Use git diff/status/log only.'
+  if (/\brm\s+-\w*r\w*f?\w*\s+(\/|~|\.\.|\*)/.test(cmd) || /\bsudo\b|\bcurl\b[^|]*\|\s*(ba)?sh/.test(cmd)) return 'That command is not allowed.'
+  return null
+}
+
 const q = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`
 
 const ALIASES: Record<string, string> = { grep: 'search', read: 'read_file', cat: 'read_file', open: 'read_file', edit: 'replace', str_replace: 'replace', create_file: 'write_file', write: 'write_file', run: 'bash', shell: 'bash', sh: 'bash', ls: 'bash', done: 'finish' }
@@ -29,12 +37,15 @@ export async function execute(root: string, rawCall: ToolCall): Promise<string> 
     switch (call.tool) {
       case 'bash': {
         if (!a.command) return 'ERROR: missing command'
+        const blocked = blockedCommand(a.command)
+        if (blocked) return `ERROR: ${blocked}`
         const r = await runShell(root, a.command)
         return `exit ${r.code}\n${r.output}`
       }
       case 'search': {
         if (!a.pattern) return 'ERROR: search needs "pattern"'
-        const target = a.path ? q(safePath(root, a.path)) : '.'
+        const target = a.path ? q(a.path) : '.'
+        if (a.path) safePath(root, a.path)
         const cmd = `(command -v rg >/dev/null && rg -n --no-heading -S -g '!node_modules' -g '!.git' -e ${q(a.pattern)} ${target} || grep -rnE --exclude-dir=node_modules --exclude-dir=.git ${q(a.pattern)} ${target}) | head -80`
         const r = await runShell(root, cmd, 30_000)
         return r.output.trim() || 'no matches'
@@ -68,7 +79,7 @@ export async function execute(root: string, rawCall: ToolCall): Promise<string> 
   }
 }
 
-/** Escapes raw control characters inside JSON string literals (common weak-model mistake). */
+/** Repairs common weak-model JSON mistakes: raw newlines in strings, trailing commas, stray quotes after numbers. */
 function repairJson(s: string): string {
   let out = '', inStr = false, esc = false
   for (const ch of s) {
@@ -82,7 +93,27 @@ function repairJson(s: string): string {
       else out += ch
     } else { if (ch === '"') inStr = true; out += ch }
   }
-  return out.replace(/,\s*([}\]])/g, '$1')
+  return out.replace(/,\s*([}\]])/g, '$1').replace(/(:\s*-?\d+(?:\.\d+)?)"(\s*[,}])/g, '$1$2')
+}
+
+const ARG_KEYS = ['command', 'pattern', 'path', 'start', 'end', 'old', 'new', 'content', 'summary']
+
+/** Last resort: pull fields out by key names, so unescaped quotes inside code (`"new": "a = "b""`) still work. */
+function lenientParse(text: string): ToolCall | null {
+  const tool = text.match(/"tool"\s*:\s*"([\w.-]+)"/)?.[1]
+  if (!tool) return null
+  const argsAt = text.search(/"args"\s*:/)
+  const body = argsAt >= 0 ? text.slice(argsAt) : text
+  const marks = ARG_KEYS.flatMap((k) => { const m = new RegExp(`"${k}"\\s*:\\s*`).exec(body); return m ? [{ k, i: m.index, v: m.index + m[0].length }] : [] }).sort((x, y) => x.i - y.i)
+  const args: Record<string, string> = {}
+  marks.forEach((m, n) => {
+    let raw = body.slice(m.v, n + 1 < marks.length ? marks[n + 1].i : body.length).trim()
+    raw = raw.replace(/[}\s`]*$/, '').replace(/,\s*$/, '')
+    if (raw.startsWith('"')) raw = raw.slice(1).replace(/"\s*$/, '')
+    else raw = raw.replace(/"$/, '')
+    args[m.k] = raw.replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\"/g, '"').replace(/\\\\/g, '\\')
+  })
+  return { tool, args }
 }
 
 export function parseToolCall(text: string): ToolCall | null {
@@ -102,5 +133,14 @@ export function parseToolCall(text: string): ToolCall | null {
       } catch { /* try next */ }
     }
   }
+  // Every strict attempt failed — try the lenient extractor on the best candidate.
+  for (const c of candidates) { const l = lenientParse(c); if (l) return l }
   return null
+}
+
+/** Human-readable reason a reply could not be parsed (fed back to the model). */
+export function parseProblem(text: string): string {
+  const c = text.match(/```(?:json)?\s*([\s\S]*?)```/)?.[1] ?? text.slice(text.indexOf('{'))
+  if (!text.includes('{')) return 'Your reply contained no tool call.'
+  try { JSON.parse(c); return 'The JSON parsed but has no "tool" field.' } catch (e) { return `Your JSON is invalid (${(e as Error).message.slice(0, 120)}). Check quotes and commas.` }
 }

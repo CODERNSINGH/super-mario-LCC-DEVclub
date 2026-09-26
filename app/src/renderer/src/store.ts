@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 
 export type Step = 'repo' | 'github' | 'llm' | 'workspace'
-export interface GhUser { login: string; name: string | null; avatar_url: string }
+export interface GhUser { id?: number; login: string; name: string | null; avatar_url: string }
 export interface LlmChoice { provider: string; model: string; baseUrl?: string }
 
 interface State {

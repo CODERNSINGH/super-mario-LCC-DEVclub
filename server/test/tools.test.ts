@@ -40,3 +40,22 @@ test('cleanPath strips line suffixes and ./', async () => {
   assert.equal(cleanPath('./src/a.ts:42'), 'src/a.ts')
   assert.equal(cleanPath('src/a.ts#L3-L9'), 'src/a.ts')
 })
+
+test('repairs a stray quote after a number', () => {
+  const c = parseToolCall('```json\n{"tool":"read_file","args":{"path":"src/a.js","start":15,"end":25"}}\n```')
+  assert.deepEqual(c, { tool: 'read_file', args: { path: 'src/a.js', start: '15', end: '25' } })
+})
+
+test('lenient parser keeps unescaped quotes inside code', () => {
+  const c = parseToolCall('{"tool":"replace","args":{"path":"a.js","old":"return a - b","new":"return a - b + "x""}}')
+  assert.equal(c?.tool, 'replace')
+  assert.equal(c?.args.new, 'return a - b + "x"')
+})
+
+test('bash guard blocks dependency and git changes', async () => {
+  const { blockedCommand } = await import('../src/tools/index.js')
+  assert.ok(blockedCommand('npm install --save-dev jest'))
+  assert.ok(blockedCommand('git commit -am x'))
+  assert.equal(blockedCommand('npm test'), null)
+  assert.equal(blockedCommand('git diff'), null)
+})

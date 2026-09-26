@@ -21,7 +21,7 @@ export async function createBranch(root: string, name: string): Promise<void> {
   await simpleGit(root).checkoutLocalBranch(name)
 }
 
-export interface PrInput { root: string; repo: string; token: string; branch: string; title: string; body: string; base?: string }
+export interface PrInput { author?: { name: string; email: string }; root: string; repo: string; token: string; branch: string; title: string; body: string; base?: string }
 
 export async function commitPushPr(i: PrInput): Promise<{ url: string; number: number }> {
   const g = simpleGit(i.root)
@@ -29,8 +29,12 @@ export async function commitPushPr(i: PrInput): Promise<{ url: string; number: n
   if (!files.length) throw new Error('No changes to commit')
   const branches = await g.branchLocal()
   if (branches.current !== i.branch) await g.checkoutLocalBranch(i.branch).catch(() => g.checkout(i.branch))
+  // Machines without a git identity would fail with "Please tell me who you are": fall back to the GitHub account.
+  const hasName = (await g.getConfig('user.name')).value, hasEmail = (await g.getConfig('user.email')).value
+  if (i.author && !hasName) await g.addConfig('user.name', i.author.name, false, 'local')
+  if (i.author && !hasEmail) await g.addConfig('user.email', i.author.email, false, 'local')
   await g.add('.')
-  await g.commit(`${i.title}\n\nCo-authored by Sakai`)
+  await g.commit(i.title)
   await g.raw(['-c', authed(i.token), 'push', '-u', 'origin', i.branch])
 
   const base = i.base ?? (await defaultBranch(i.repo, i.token))

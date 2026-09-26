@@ -34,7 +34,7 @@ function EstimateCard({ e, provider, model }: { e: Estimate; provider: string; m
 }
 
 export function TaskPanel() {
-  const { repo, localPath, llm } = useApp()
+  const { repo, localPath, llm, user } = useApp()
   const s = useSession()
   const abort = useRef<AbortController | null>(null)
   const [err, setErr] = useState('')
@@ -99,7 +99,7 @@ export function TaskPanel() {
     try {
       const token = await window.sakai.github.token()
       const body = `${s.summary}\n\n${s.picked ? `Closes #${s.picked.number}\n\n` : ''}---\nResolved autonomously by Sakai (${llm!.provider}/${llm!.model}). Steps: ${s.usage.steps}, tokens: ${s.usage.inputTokens + s.usage.outputTokens}.`
-      const pr = await post<{ url: string; number: number }>('/git/pr', { root: localPath, repo, token, branch: s.branch || `sakai/${Date.now()}`, title: s.picked ? `Fix #${s.picked.number}: ${s.picked.title}` : s.goal.slice(0, 70), body })
+      const pr = await post<{ url: string; number: number }>('/git/pr', { root: localPath, repo, token, branch: s.branch || `sakai/${Date.now()}`, title: s.picked ? `Fix #${s.picked.number}: ${s.picked.title}` : s.goal.slice(0, 70), body, author: user ? { name: user.name || user.login, email: `${user.id ? user.id + '+' : ''}${user.login}@users.noreply.github.com` } : undefined })
       s.set({ pr }); s.log(`✓ Pull request #${pr.number} opened: ${pr.url}`)
     } catch (e) { setErr(cleanErr(e)) } finally { setBusy(false) }
   }

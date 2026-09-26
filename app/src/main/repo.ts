@@ -20,6 +20,7 @@ export function registerRepoIpc(getSecret: (k: string) => string | null): void {
     mkdirSync(root, { recursive: true })
     const win = BrowserWindow.fromWebContents(e.sender)
     const log = (line: string) => win?.webContents.send('repo:log', line)
+    if ((await git(root, ['--version'])).code !== 0) throw new Error('Git is not installed on this Mac. Open Terminal, run:  xcode-select --install  — then press Retry clone.')
     const url = `https://github.com/${repo}.git`
     const auth = ['-c', `http.extraheader=Authorization: Basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`]
 

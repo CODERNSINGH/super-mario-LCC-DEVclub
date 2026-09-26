@@ -14,7 +14,7 @@
     "dev:web": "npm run dev -w web",
     "build": "npm run build -ws --if-present",
     "typecheck": "npm run typecheck -ws --if-present",
-    "dist": "npm run build -w server && npm run dist -w app",
+    "dist": "node scripts/check-config.mjs && npm run build -w server && npm run dist -w app",
     "issues": "bash scripts/list-issues.sh"
   }
 }
