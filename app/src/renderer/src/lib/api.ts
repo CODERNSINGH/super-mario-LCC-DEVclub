@@ -10,7 +10,7 @@ export async function post<T>(path: string, body: unknown): Promise<T> {
   return data as T
 }
 
-export interface LlmConfig { baseUrl: string; apiKey?: string; model: string; kind: 'openai' | 'anthropic' | 'ollama' }
+export interface LlmConfig { baseUrl: string; apiKey?: string; model: string; kind: 'openai' | 'anthropic' | 'ollama'; native?: boolean }
 
 /** Resolves the user's chosen provider into a concrete server config (key from Keychain or .env). */
 export async function resolveLlm(): Promise<LlmConfig> {
@@ -19,7 +19,9 @@ export async function resolveLlm(): Promise<LlmConfig> {
   const providers = await window.sakai.llm.providers()
   const p = providers.find((x) => x.id === choice.provider)!
   const apiKey = await window.sakai.llm.key(p.id)
-  return { baseUrl: p.baseUrl, apiKey, model: choice.model, kind: p.kind as LlmConfig['kind'] }
+  // Hosted OpenAI-compatible APIs support native function calling; local runtimes use the text protocol.
+  const native = ['groq', 'openai', 'deepseek', 'qwen'].includes(p.id) && !/reasoner/.test(choice.model)
+  return { baseUrl: p.baseUrl, apiKey, model: choice.model, kind: p.kind as LlmConfig['kind'], native }
 }
 
 export type AgentEvent =

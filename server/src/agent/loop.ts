@@ -1,4 +1,4 @@
-import { complete, type LlmConfig, type Message } from '../llm/client.js'
+import { complete, ToolCallRejected, type LlmConfig, type Message } from '../llm/client.js'
 import { execute, parseToolCall, TOOL_DOCS, type ToolCall } from '../tools/index.js'
 import { repoMap, detectTestCommand } from '../repo/info.js'
 import { currentDiff } from '../git.js'
@@ -49,13 +49,25 @@ export async function runAgent(o: RunOptions): Promise<RunResult> {
   for (let step = 1; step <= max; step++) {
     if (o.signal?.aborted) return { finished: false, summary: 'Cancelled', inputTokens: inT, outputTokens: outT, steps: step - 1 }
     o.onEvent({ type: 'status', data: `Step ${step}/${max}` })
-    const r = await complete(o.llm, compact(messages), o.signal)
+    let r
+    try {
+      r = await complete(o.llm, compact(messages), o.signal)
+    } catch (e) {
+      if (!(e instanceof ToolCallRejected)) throw e
+      // The model tried a tool we don't offer (e.g. gpt-oss "repo_browser.*"). Correct it and retry.
+      if (++badFormat >= 4) return { finished: false, summary: 'Model repeatedly called tools that do not exist', inputTokens: inT, outputTokens: outT, steps: step }
+      o.onEvent({ type: 'status', data: 'Model used an unknown tool; retrying' })
+      messages.push({ role: 'user', content: `That tool does not exist (you tried: ${e.failedGeneration.slice(0, 160)}). Use ONLY these tools: bash, search, read_file, replace, write_file, finish. To list files use bash with "git ls-files | head -100".` })
+      continue
+    }
     inT += r.inputTokens; outT += r.outputTokens
     o.onEvent({ type: 'usage', data: { inputTokens: inT, outputTokens: outT, steps: step } })
     o.onEvent({ type: 'assistant', data: r.text })
-    messages.push({ role: 'assistant', content: r.text })
+    // Native function call → normalise into the same JSON-block form the history uses.
+    const nativeCall: ToolCall | null = r.toolCall ? { tool: r.toolCall.name, args: Object.fromEntries(Object.entries(r.toolCall.args).map(([k, v]) => [k, typeof v === 'string' ? v : String(v)])) } : null
+    messages.push({ role: 'assistant', content: nativeCall ? `${r.text}\n\`\`\`json\n${JSON.stringify(nativeCall)}\n\`\`\`` : r.text })
 
-    const call = parseToolCall(r.text)
+    const call = nativeCall ?? parseToolCall(r.text)
     if (!call) {
       if (++badFormat >= 4) return { finished: false, summary: 'Model repeatedly failed to produce valid tool calls', inputTokens: inT, outputTokens: outT, steps: step }
       messages.push({ role: 'user', content: `Invalid format. Reply with exactly ONE tool call as valid JSON inside a \`\`\`json block, nothing else. Example:\n\`\`\`json\n{"tool":"search","args":{"pattern":"function sum"}}\n\`\`\`\n${TOOL_DOCS}` })
