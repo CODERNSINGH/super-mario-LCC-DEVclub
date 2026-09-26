@@ -23,6 +23,17 @@ Issue ─▶ understand ─▶ localize (search/read) ─▶ reproduce ─▶ fi
 
 There is nothing else to configure: no `.env`, no OAuth app. GitHub tokens and API keys are stored encrypted in your macOS Keychain.
 
+### Signing in to GitHub
+Click **Connect GitHub**. Sakai shows a short code and opens github.com/login/device — enter the code and approve. That's it (GitHub "Device Flow": no passwords or secrets ever pass through Sakai). If the browser doesn't open, use the **Open GitHub** button or visit the address yourself. Offline, or the code expired? Just click Connect again. Revoked access on GitHub? Sakai signs you out cleanly and asks you to reconnect.
+
+### No GitHub? Use a local folder
+You can skip GitHub entirely: choose **Use a local folder** on the first screen and pick any project (Sakai turns it into a git repo with an initial commit if it isn't one, never touching existing history). Describe the bug yourself, let Sakai fix it, then commit locally. Want to try it first? **Try the demo project** creates `~/Sakai/sakai-demo` with four planted bugs (see its `BUGS.md`) — or plant your own bugs in the source and see if Sakai finds them.
+
+### Requirements on your Mac
+- **Git** — if missing, macOS can install it: run `xcode-select --install` in Terminal. Sakai shows this hint itself.
+- **Node.js** — only needed for JavaScript projects whose tests Sakai runs.
+- Commits use your git identity; if you have none, Sakai uses your GitHub account (or `Sakai <sakai@localhost>` in local mode).
+
 ## Build from source (developers / publishers)
 Requirements: macOS, Node 20+, git.
 ```bash

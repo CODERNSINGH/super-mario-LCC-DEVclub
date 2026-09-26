@@ -5,8 +5,10 @@ const invoke = <T>(ch: string, ...a: unknown[]) => ipcRenderer.invoke(ch, ...a) 
 const api = {
   github: {
     start: () => invoke<{ device_code: string; user_code: string; verification_uri: string; interval: number; expires_in: number }>('github:start'),
-    poll: (code: unknown) => invoke<{ login: string; name: string | null; avatar_url: string }>('github:poll', code),
-    user: () => invoke<{ login: string; name: string | null; avatar_url: string } | null>('github:user'),
+    poll: (code: unknown) => invoke<{ id: number; login: string; name: string | null; avatar_url: string }>('github:poll', code),
+    cancel: () => invoke<void>('github:cancel'),
+    open: (uri?: string) => invoke<void>('github:open', uri),
+    user: () => invoke<{ id: number; login: string; name: string | null; avatar_url: string } | null>('github:user'),
     token: () => invoke<string | null>('github:token'),
     signOut: () => invoke<void>('github:signout'),
     issues: (repo: string) => invoke<{ number: number; title: string; body: string; labels: string[] }[]>('github:issues', repo),
@@ -29,6 +31,16 @@ const api = {
     key: (id: string) => invoke<string>('llm:key', id),
     envKey: (id: string) => invoke<string>('llm:envKey', id),
     test: (id: string, key: string, baseUrl?: string) => invoke<{ ok: boolean; message: string; models?: string[] }>('llm:test', id, key, baseUrl),
+  },
+  local: {
+    pickFolder: () => invoke<string | null>('local:pick'),
+    inspect: (path: string) => invoke<{ path: string; name: string; isGitRepo: boolean; branch: string | null; dirty: boolean; hasCommits: boolean }>('local:inspect', path),
+    ensureRepo: (path: string) => invoke<void>('local:ensureRepo', path),
+    createDemo: () => invoke<string>('local:createDemo'),
+    revealInFinder: (path: string) => invoke<void>('local:reveal', path),
+  },
+  system: {
+    check: () => invoke<{ git: boolean; node: boolean; online: boolean }>('system:check'),
   },
   serverUrl: () => invoke<string>('server:url'),
   term: {

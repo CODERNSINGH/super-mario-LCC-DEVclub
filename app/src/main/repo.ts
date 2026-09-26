@@ -1,5 +1,5 @@
 import { ipcMain, BrowserWindow, app } from 'electron'
-import { spawn } from 'node:child_process'
+import { runGit as git, GIT_MISSING_MESSAGE } from './git'
 import { join } from 'node:path'
 import { existsSync, mkdirSync } from 'node:fs'
 
@@ -20,7 +20,7 @@ export function registerRepoIpc(getSecret: (k: string) => string | null): void {
     mkdirSync(root, { recursive: true })
     const win = BrowserWindow.fromWebContents(e.sender)
     const log = (line: string) => win?.webContents.send('repo:log', line)
-    if ((await git(root, ['--version'])).code !== 0) throw new Error('Git is not installed on this Mac. Open Terminal, run:  xcode-select --install  — then press Retry clone.')
+    if ((await git(root, ['--version'])).code !== 0) throw new Error(GIT_MISSING_MESSAGE.replace('try again', 'press Retry clone'))
     const url = `https://github.com/${repo}.git`
     const auth = ['-c', `http.extraheader=Authorization: Basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`]
 
@@ -61,16 +61,5 @@ export function registerRepoIpc(getSecret: (k: string) => string | null): void {
     const r = await git(root, [...auth, 'clone', '--progress', url, dest], log)
     if (r.code !== 0) throw new Error(`git clone failed (exit ${r.code}). Check the repository exists and your GitHub account has access.`)
     return dest
-  })
-}
-
-function git(cwd: string, args: string[], log?: (l: string) => void): Promise<{ code: number; out: string }> {
-  return new Promise((resolve) => {
-    const p = spawn('git', args, { cwd, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } })
-    let out = ''
-    const onData = (d: Buffer) => { const t = String(d); out += t; if (log && t.trim()) log(t.trimEnd()) }
-    p.stdout.on('data', onData); p.stderr.on('data', onData)
-    p.on('error', (err) => resolve({ code: 1, out: String(err) }))
-    p.on('close', (code) => resolve({ code: code ?? 1, out }))
   })
 }
