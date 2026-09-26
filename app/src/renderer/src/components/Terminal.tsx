@@ -7,6 +7,8 @@ import { useSession } from '../lib/session'
 export function Terminal({ cwd, visible }: { cwd: string | null; visible: boolean }) {
   const host = useRef<HTMLDivElement>(null)
   const fitRef = useRef<FitAddon | null>(null)
+  const idRef = useRef(0)
+  const cwdRef = useRef(cwd)
 
   useEffect(() => {
     const term = new XTerm({
@@ -22,6 +24,7 @@ export function Terminal({ cwd, visible }: { cwd: string | null; visible: boolea
     let off = () => {}
     void window.sakai.term.create(cwd, term.cols, term.rows).then((i) => {
       id = i
+      idRef.current = i
       useSession.getState().set({ termId: i })
       off = window.sakai.term.onData((tid, d) => { if (tid === id) term.write(d) })
       term.onData((d) => window.sakai.term.write(id, d))
@@ -30,6 +33,14 @@ export function Terminal({ cwd, visible }: { cwd: string | null; visible: boolea
     const ro = new ResizeObserver(() => { try { fit.fit() } catch { /* hidden */ } })
     ro.observe(host.current!)
     return () => { ro.disconnect(); off(); if (id) window.sakai.term.kill(id); term.dispose() }
+  }, []) // one shell for the whole session; cwd changes are handled below
+
+  // When the repo finishes cloning, move the existing shell there instead of replacing it (keeps user's typing/history).
+  useEffect(() => {
+    if (cwd && cwd !== cwdRef.current && idRef.current) {
+      window.sakai.term.write(idRef.current, `cd '${cwd.replace(/'/g, `'\\''`)}' && clear\r`)
+      cwdRef.current = cwd
+    }
   }, [cwd])
 
   useEffect(() => { if (visible) requestAnimationFrame(() => fitRef.current?.fit()) }, [visible])

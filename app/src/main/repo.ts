@@ -1,7 +1,7 @@
 import { ipcMain, BrowserWindow, app } from 'electron'
 import { spawn } from 'node:child_process'
 import { join } from 'node:path'
-import { mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 
 /** Parses "owner/name" out of a GitHub URL or shorthand. */
 export function parseRepo(input: string): string | null {
@@ -12,21 +12,54 @@ export function parseRepo(input: string): string | null {
 export function registerRepoIpc(getSecret: (k: string) => string | null): void {
   ipcMain.handle('repo:parse', (_e, input: string) => parseRepo(input))
 
-  // Clones with the user's OAuth token; streams logs to the renderer.
-  ipcMain.handle('repo:clone', (e, repo: string) => {
+  // Clones (or reuses) the repo using the user's OAuth token; streams logs to the renderer.
+  ipcMain.handle('repo:clone', async (e, repo: string) => {
     const token = getSecret('github')
     if (!token) throw new Error('Not signed in')
     const root = join(app.getPath('home'), 'Sakai')
     mkdirSync(root, { recursive: true })
-    const dest = join(root, repo.replace('/', '__'))
     const win = BrowserWindow.fromWebContents(e.sender)
     const log = (line: string) => win?.webContents.send('repo:log', line)
-    return new Promise<string>((resolve, reject) => {
-      log(`$ git clone https://github.com/${repo}.git ${dest}`)
-      const p = spawn('git', ['-c', `http.extraheader=Authorization: Basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`, 'clone', '--progress', `https://github.com/${repo}.git`, dest])
-      p.stdout.on('data', (d) => log(String(d).trimEnd()))
-      p.stderr.on('data', (d) => log(String(d).trimEnd()))
-      p.on('close', (c) => (c === 0 ? resolve(dest) : reject(new Error(`git clone exited with ${c}`))))
-    })
+    const url = `https://github.com/${repo}.git`
+    const auth = ['-c', `http.extraheader=Authorization: Basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`]
+
+    let dest = join(root, repo.replace('/', '__'))
+    if (existsSync(dest)) {
+      const remote = await git(dest, ['remote', 'get-url', 'origin'])
+      if (remote.code === 0 && remote.out.trim().replace(/\.git$/, '').endsWith(`github.com/${repo}`)) {
+        log(`✓ Found existing clone at ${dest}`)
+        log('$ git fetch origin')
+        await git(dest, [...auth, 'fetch', '--prune', 'origin'], log)
+        const dirty = (await git(dest, ['status', '--porcelain'])).out.trim()
+        if (dirty) log('! Uncommitted changes present — leaving your working tree untouched')
+        else {
+          log('$ git pull --ff-only')
+          const r = await git(dest, [...auth, 'pull', '--ff-only'], log)
+          if (r.code !== 0) log('! Could not fast-forward — continuing with the local copy')
+        }
+        return dest
+      }
+      // Folder exists but is not this repository: never overwrite it, use a fresh name instead.
+      let n = 2
+      while (existsSync(`${dest}-${n}`)) n++
+      dest = `${dest}-${n}`
+      log(`! ${join(root, repo.replace('/', '__'))} is not a clone of ${repo}; using ${dest}`)
+    }
+
+    log(`$ git clone ${url} ${dest}`)
+    const r = await git(root, [...auth, 'clone', '--progress', url, dest], log)
+    if (r.code !== 0) throw new Error(`git clone failed (exit ${r.code}). Check the repository exists and your GitHub account has access.`)
+    return dest
+  })
+}
+
+function git(cwd: string, args: string[], log?: (l: string) => void): Promise<{ code: number; out: string }> {
+  return new Promise((resolve) => {
+    const p = spawn('git', args, { cwd, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } })
+    let out = ''
+    const onData = (d: Buffer) => { const t = String(d); out += t; if (log && t.trim()) log(t.trimEnd()) }
+    p.stdout.on('data', onData); p.stderr.on('data', onData)
+    p.on('error', (err) => resolve({ code: 1, out: String(err) }))
+    p.on('close', (code) => resolve({ code: code ?? 1, out }))
   })
 }

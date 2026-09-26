@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useApp } from '../store'
 import { useSession, type Side } from '../lib/session'
 import { Explorer } from '../components/Explorer'
@@ -27,25 +27,32 @@ export function Workspace() {
   const logEnd = useRef<HTMLDivElement>(null)
   const started = useRef(false)
 
+  const [failed, setFailed] = useState(false)
+
+  const load = useCallback(async () => {
+    const st = useSession.getState()
+    setFailed(false)
+    try {
+      const path = await window.sakai.repo.clone(repo!)
+      set({ localPath: path })
+      st.log(`✓ Ready at ${path}`)
+      st.log('$ gh issue list --state open')
+      const list = await window.sakai.github.issues(repo!)
+      st.set({ issues: list })
+      st.log(`✓ ${list.length} open issue(s) found. Pick one, or describe your own task.`)
+    } catch (e) {
+      st.log(`✗ ${cleanErr(e)}`)
+      st.log('→ Fix it in the Terminal tab (⌘`) — you can run git commands yourself — then press "Retry clone".')
+      setFailed(true)
+    }
+  }, [repo, set])
+
   useEffect(() => {
     pushRecent(repo!)
     const off = window.sakai.repo.onLog((l) => useSession.getState().log(l))
-    if (started.current) return off
-    started.current = true
-    void (async () => {
-      const st = useSession.getState()
-      try {
-        const path = await window.sakai.repo.clone(repo!)
-        set({ localPath: path })
-        st.log(`✓ Cloned to ${path}`)
-        st.log('$ gh issue list --state open')
-        const list = await window.sakai.github.issues(repo!)
-        st.set({ issues: list })
-        st.log(`✓ ${list.length} open issue(s) found. Pick one, or describe your own task.`)
-      } catch (e) { st.log(`✗ ${cleanErr(e)}`) }
-    })()
+    if (!started.current) { started.current = true; void load() }
     return off
-  }, [repo, set])
+  }, [repo, load])
 
   useEffect(() => { logEnd.current?.scrollIntoView() }, [s.logs.length])
 
@@ -95,7 +102,7 @@ export function Workspace() {
                     {i.labels.length > 0 && <div className="mt-1 flex gap-1 flex-wrap">{i.labels.slice(0, 3).map((l) => <span key={l} className="text-[10px] px-1.5 rounded border border-line text-muted">{l}</span>)}</div>}
                   </button>
                 ))}
-                {!s.issues.length && <p className="px-4 py-2 text-muted text-xs">{localPath ? 'No open issues.' : 'Cloning repository…'}</p>}
+                {!s.issues.length && <p className="px-4 py-2 text-muted text-xs">{localPath ? 'No open issues.' : failed ? 'Clone failed — see logs below.' : 'Cloning repository…'}</p>}
               </>
             )}
             {s.side === 'explorer' && <Explorer />}
@@ -128,14 +135,15 @@ export function Workspace() {
             <div className="h-56 shrink-0 border-t border-line bg-panel flex flex-col">
               <div className="h-8 px-2 flex items-center gap-1 text-[11px] uppercase tracking-wider border-b border-line shrink-0">
                 {(['logs', 'terminal'] as const).map((p) => <button key={p} onClick={() => s.set({ panel: p })} className={`px-2 h-full ${s.panel === p ? 'text-ink border-b border-sakai' : 'text-muted hover:text-fg'}`}>{p}</button>)}
-                <button onClick={() => s.set({ panelOpen: false })} className="ml-auto px-2 text-muted hover:text-ink">×</button>
+                {failed && <button onClick={() => { s.log('$ retry clone'); void load() }} className="ml-auto px-2 h-6 rounded bg-sakai text-ink normal-case tracking-normal">Retry clone</button>}
+                <button onClick={() => s.set({ panelOpen: false })} className={`${failed ? '' : 'ml-auto'} px-2 text-muted hover:text-ink`}>×</button>
               </div>
               <div className="flex-1 min-h-0 relative">
                 <div className={`absolute inset-0 overflow-auto px-4 py-2 font-mono text-[12px] ${s.panel === 'logs' ? '' : 'invisible'}`}>
                   {s.logs.map((l, i) => <div key={i} className={`whitespace-pre-wrap ${l.startsWith('✗') ? 'text-sakai' : l.startsWith('$') ? 'text-ink' : ''}`}>{l}</div>)}
                   <div ref={logEnd} />
                 </div>
-                {localPath && <div className={`absolute inset-0 ${s.panel === 'terminal' ? '' : 'invisible'}`}><Terminal cwd={localPath} visible={s.panel === 'terminal'} /></div>}
+                <div className={`absolute inset-0 ${s.panel === 'terminal' ? '' : 'invisible'}`}><Terminal cwd={localPath} visible={s.panel === 'terminal'} /></div>
               </div>
             </div>
           )}
