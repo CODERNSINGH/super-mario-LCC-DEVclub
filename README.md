@@ -41,6 +41,9 @@ Shortcuts: `⌘K` command palette · `` ⌘` `` terminal · `⌘J` toggle panel 
 
 Extras: **Quick commands** (activity bar `›_`) lets you save one-click terminal commands; **Settings** (⚙) switches model, repository or account. Files in the explorer are editable.
 
+## Test repository
+Sakai is being evaluated on [Keshavr57/Bugy-Calcu](https://github.com/Keshavr57/Bugy-Calcu) — four open bugs (subtract operand order, operator precedence, multiplication by zero, decimal handling). Full list: [docs/TEST-ISSUES.md](docs/TEST-ISSUES.md).
+
 ## Pick test issues
 ```bash
 npm run issues -- owner/repo   # writes docs/TEST-ISSUES.md with every open issue
