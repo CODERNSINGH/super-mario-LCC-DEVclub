@@ -1,11 +1,11 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/black_bg_logo.jpeg">
-    <img src="assets/white_bg_logo.jpeg" alt="Sakai" width="180">
+    <img src="assets/white_bg_logo.jpeg" alt="Sakai IDE" width="180">
   </picture>
 </p>
 
-<h1 align="center">Sakai</h1>
+<h1 align="center">Sakai IDE</h1>
 
 An autonomous AI engineer for GitHub issues. Sakai clones your repository, understands the code, fixes the issue with tool-driven edits, runs your tests, self-reviews the diff, and opens a pull request — all from a VS Code–style desktop workspace (macOS).
 

@@ -5,7 +5,7 @@ export function Logo({ size = 28, text = true }: { size?: number; text?: boolean
   return (
     <div className="flex items-center gap-2.5">
       <Mascot size={size} />
-      {text && <span className="text-ink text-[15px] font-semibold tracking-wide">Sakai</span>}
+      {text && <span className="text-ink text-[15px] font-semibold tracking-wide">Sakai IDE</span>}
     </div>
   )
 }

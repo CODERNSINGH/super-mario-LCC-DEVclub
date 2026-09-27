@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "main": "out/main/index.js",
-  "description": "Sakai desktop app (macOS)",
+  "description": "Sakai IDE \u2014 autonomous AI coding agent for GitHub issues",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
@@ -40,7 +40,7 @@
   },
   "build": {
     "appId": "com.sakai.app",
-    "productName": "Sakai",
+    "productName": "Sakai IDE",
     "directories": {
       "output": "release",
       "buildResources": "build"
@@ -73,10 +73,10 @@
       "identity": null
     },
     "dmg": {
-      "title": "Sakai",
+      "title": "Sakai IDE",
       "backgroundColor": "#0b0b0c"
     },
-    "artifactName": "Sakai-${version}-${arch}.${ext}",
+    "artifactName": "Sakai-IDE-${version}-${arch}.${ext}",
     "electronVersion": "44.4.5"
   },
   "author": "Sakai"

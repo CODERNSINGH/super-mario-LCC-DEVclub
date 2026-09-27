@@ -8,6 +8,7 @@ import { killAllTerminals } from './terminal'
 
 function createWindow(): void {
   const win = new BrowserWindow({
+    title: 'Sakai IDE',
     width: 1280,
     height: 820,
     minWidth: 960,

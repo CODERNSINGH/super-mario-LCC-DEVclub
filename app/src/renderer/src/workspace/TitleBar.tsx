@@ -79,7 +79,7 @@ export function useMenus(): Record<string, MenuItem[]> {
       { label: 'Show All Commands', shortcut: '⇧⌘P', action: () => A.openPalette('commands') },
       { label: 'Change Model…', action: A.changeModel },
       sep,
-      { label: 'About Sakai', action: () => s.set({ modal: { title: 'Sakai', body: 'An autonomous AI engineer for GitHub issues. It reads your repository, edits code with tools, runs your tests and hands you a verified change. Version 0.1.0.', confirm: 'OK', cancel: 'Close', onConfirm: () => undefined } }) },
+      { label: 'About Sakai IDE', action: () => s.set({ modal: { title: 'Sakai IDE', body: 'An autonomous AI engineer for GitHub issues. It reads your repository, edits code with tools, runs your tests and hands you a verified change. Version 0.1.0.', confirm: 'OK', cancel: 'Close', onConfirm: () => undefined } }) },
     ],
   }
 }
@@ -90,7 +90,7 @@ export function TitleBar() {
   const menus = useMenus()
   const [open, setOpen] = useState<string | null>(null)
   const ref = useOutside(() => setOpen(null), open !== null)
-  const name = repo ?? localPath?.split('/').pop() ?? 'Sakai'
+  const name = repo ?? localPath?.split('/').pop() ?? 'Sakai IDE'
   const tog = (on: boolean, fn: () => void, icon: React.ReactNode, title: string) => (
     <button title={title} onClick={fn} className={`no-drag w-7 h-6 grid place-items-center rounded hover:bg-hover ${on ? 'text-ink' : 'text-muted'}`}>{icon}</button>
   )
