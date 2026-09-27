@@ -22,7 +22,7 @@ A VS Code-style desktop IDE wrapped around an autonomous coding agent that repro
 
 <p align="center">
   <a href="https://github.com/CODERNSINGH/super-mario-LCC-DEVclub/releases/latest">
-    <img alt="Download Sakai IDE for macOS" src="https://img.shields.io/badge/%E2%AC%87%20%20DOWNLOAD%20SAKAI%20IDE%20FOR%20macOS-BC002D?style=for-the-badge&logo=apple&logoColor=white" height="72">
+    <img alt="Download Sakai IDE for macOS" src="https://img.shields.io/badge/%E2%AC%87%20%20DOWNLOAD%20SAKAI%20IDE%20FOR%20macOS-BC002D?style=for-the-badge&logo=apple&logoColor=white" height="108">
   </a>
 </p>
 <p align="center"><sub>Apple Silicon (M1 and newer) &nbsp;·&nbsp; free &nbsp;·&nbsp; <a href="#b-download-the-app-macos-apple-silicon">one-line installer &amp; help</a> &nbsp;·&nbsp; or <a href="#a-evaluator--clone-and-run-makefile">run from source</a> with <code>make setup &amp;&amp; make run</code></sub></p>
