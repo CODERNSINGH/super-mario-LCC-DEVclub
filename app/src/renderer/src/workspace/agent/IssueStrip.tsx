@@ -32,7 +32,7 @@ export function IssueStrip({ root }: { root: string | null }) {
       {open && (
         <div className="max-h-[210px] overflow-auto pb-1.5 px-2 space-y-1">
           {s.issues.length === 0 && <p className="px-1 py-1.5 text-[12px] text-muted">{busy ? 'Loading…' : 'No open issues. Describe your own task below.'}</p>}
-          {s.issues.map((i) => {
+          {s.issues.slice(0, 2).map((i) => {
             const active = s.solving === i.number && running
             return (
               <div key={i.number} className={`group flex items-center gap-2 rounded-lg border px-2 py-1.5 ${active ? 'border-sakai/60 bg-sakai/10' : 'border-line bg-bg hover:border-line2'}`}>
@@ -48,6 +48,7 @@ export function IssueStrip({ root }: { root: string | null }) {
               </div>
             )
           })}
+          {s.issues.length > 2 && <button onClick={() => s.set({ side: 'issues' })} className="w-full text-left px-1 py-0.5 text-[11px] text-muted hover:text-ink">+ {s.issues.length - 2} more issues in the Issues sidebar</button>}
           {err && <p className="px-1 text-[11px] text-sakai">{err}</p>}
         </div>
       )}

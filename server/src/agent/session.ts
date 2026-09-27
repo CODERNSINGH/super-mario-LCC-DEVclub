@@ -42,7 +42,7 @@ export class Session {
 
   constructor(init: SessionInit) {
     this.mode = init.mode
-    this.maxSteps = init.maxSteps ?? 30
+    this.maxSteps = init.maxSteps ?? 60
     // No whole-run limit by default (0 = none). Stuck steps are restarted individually by the loop's watchdog.
     this.timeLimitMs = init.timeLimitMin && init.timeLimitMin > 0 ? Math.min(120, init.timeLimitMin) * 60_000 : 0
     this.state = newState({ mode: init.mode, root: init.root, llm: init.llm, issue: init.issue, notes: init.notes, testCommand: init.testCommand, deps: init.deps })

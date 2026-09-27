@@ -95,7 +95,7 @@ async function prepare(st: SessionState, io: TurnIO): Promise<void> {
   let baselineOut = ''
   if (st.hasTests) {
     io.emit({ type: 'status', data: 'Running baseline tests' })
-    const b = await runShell(st.root, `CI=1 ${st.testCmd}`, 300_000)
+    const b = await runShell(st.root, `CI=1 ${st.testCmd}`, 480_000)
     st.baseline = parseTestOutput(b.output, b.code)
     baselineOut = b.output
     io.emit({ type: 'tool', data: { call: { tool: 'baseline', args: { command: st.testCmd } }, out: `exit ${b.code}\n${failureExcerpt(b.output, 1500)}` } })
@@ -139,7 +139,7 @@ async function verify(st: SessionState, io: TurnIO): Promise<string> {
   let verdict: Verdict = 'unknown'
   if (st.hasTests) {
     io.emit({ type: 'status', data: 'Running tests' })
-    const t = await runShell(st.root, `CI=1 ${st.testCmd}`, 240_000)
+    const t = await runShell(st.root, `CI=1 ${st.testCmd}`, 480_000)
     const now = parseTestOutput(t.output, t.code)
     cmp = compareRuns(st.baseline ?? { exit: 0, failing: [], failedCount: 0, passedCount: null, unparsed: false }, now)
     parts.push(describeComparison(cmp, now))
@@ -168,6 +168,12 @@ async function verify(st: SessionState, io: TurnIO): Promise<string> {
   else if (verdict === 'differs') parts.push('The issue is not fixed yet: re-read the code you changed and correct it.')
   else if (looksFixed) parts.push('Your fix looks complete and nothing is newly broken. Call finish now with a short summary. Tests that still fail were failing before your change and belong to other issues — leave them.')
   return `[Sakai verification after your edit]\n${parts.join('\n')}`
+}
+
+/** Pre-existing failures that this change did not touch, so the user knows exactly what is left. */
+function remainingNote(st: SessionState): string {
+  const still = st.lastVerify?.comparison?.still ?? []
+  return still.length ? ` Still failing (already failing before this change, not caused by it): ${still.slice(0, 6).join('; ')}${still.length > 6 ? ` … +${still.length - 6} more` : ''}.` : ''
 }
 
 /** True when the last verification proves the fix: repro matches (or, without a repro, previously failing tests now all pass) and nothing is newly broken. */
@@ -270,7 +276,7 @@ export async function runTurn(st: SessionState, io: TurnIO, kind: 'work' | 'foll
     if (call.tool === 'finish' || call.tool === 'done') {
       if (st.mode === 'chat') return result(true, r.visible || call.args.summary || '')
       const problems = await finishProblems(st, io, turnStartVersion)
-      if (!problems.length) return result(true, call.args.summary ?? '')
+      if (!problems.length) return result(true, `${call.args.summary ?? ''}${remainingNote(st)}`)
       if (++bounces > 3) return result(false, `Could not finish: ${problems.join(' ')}`)
       io.emit({ type: 'status', data: 'Finish rejected — fixing remaining problems' })
       messages.push({ role: 'user', content: `You cannot finish yet:\n- ${problems.join('\n- ')}\nFix this, then call finish again.` })
@@ -317,7 +323,7 @@ export async function runTurn(st: SessionState, io: TurnIO, kind: 'work' | 'foll
         const v = st.lastVerify!
         const proof = v.verdict === 'match' ? `The issue's reproduction now prints the expected value${st.expected ? ` (${st.expected})` : ''}.` : `Tests now pass (${v.comparison!.fixed.length} previously failing test(s) fixed, none newly broken).`
         io.emit({ type: 'status', data: 'Fix verified — finishing' })
-        return result(true, `Fixed by editing ${files}. ${proof}`)
+        return result(true, `Fixed by editing ${files}. ${proof}${remainingNote(st)}`)
       }
     }
 
@@ -356,7 +362,7 @@ export interface RunOptions {
 
 export async function runAgent(o: RunOptions): Promise<RunResult> {
   const st = newState({ mode: 'solve', root: o.root, llm: o.llm, issue: o.issue, notes: o.notes, testCommand: o.testCommand, deps: o.deps })
-  return runTurn(st, { emit: o.onEvent, signal: o.signal, drain: () => [], maxSteps: o.maxSteps ?? 30 }, 'work')
+  return runTurn(st, { emit: o.onEvent, signal: o.signal, drain: () => [], maxSteps: o.maxSteps ?? 60 }, 'work')
 }
 
 /** Adds the user's text as the opening/follow-up message of a turn (chat gets a repo map on first use). */

@@ -3,7 +3,7 @@ import { resolve, sep } from 'node:path'
 
 const MAX_OUT = 12_000
 
-export function runShell(cwd: string, command: string, timeoutMs = 120_000): Promise<{ code: number; output: string }> {
+export function runShell(cwd: string, command: string, timeoutMs = 480_000): Promise<{ code: number; output: string }> {
   return new Promise((done) => {
     // detached => own process group, so a timeout kills the whole tree (npm -> jest -> workers), not just bash.
     const p = spawn('bash', ['-lc', command], { cwd, detached: true, env: { ...process.env, GIT_TERMINAL_PROMPT: '0', PAGER: 'cat', CI: process.env.CI ?? '1' } })

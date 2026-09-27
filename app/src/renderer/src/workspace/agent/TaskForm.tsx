@@ -56,7 +56,7 @@ export function TaskForm() {
     try {
       const cfg = await resolveLlm()
       const est = await post<Estimate>('/estimate', { root: localPath, issueText: issueText(), provider: llm!.provider, model: llm!.model, llm: cfg, withTips: true })
-      s.set({ estimate: est, stepLimit: Math.min(100, Math.max(15, Math.round(est.steps * 1.5))), testCommand: s.testCommand || est.testCommand || '' })
+      s.set({ estimate: est, stepLimit: Math.min(150, Math.max(40, Math.round(est.steps * 2))), testCommand: s.testCommand || est.testCommand || '' })
     } catch (e) { setErr(cleanErr(e)) } finally { setBusy('') }
   }
 
@@ -90,7 +90,7 @@ export function TaskForm() {
       <Field label="Extra guidance (files, constraints, expected behaviour)"><textarea rows={2} value={s.notes} onChange={(e) => s.set({ notes: e.target.value })} className={`${inp} py-2 resize-none`} /></Field>
       <div className="grid grid-cols-[1fr_74px_74px] gap-2.5">
         <Field label="Test command"><input value={s.testCommand} onChange={(e) => s.set({ testCommand: e.target.value })} className={`${inp} h-8 font-mono`} placeholder="npm test" /></Field>
-        <Field label="Step limit"><input type="number" min={5} max={100} value={s.stepLimit} onChange={(e) => s.set({ stepLimit: Math.max(5, Math.min(100, Number(e.target.value) || 30)) })} className={`${inp} h-8`} /></Field>
+        <Field label="Step limit"><input type="number" min={5} max={150} value={s.stepLimit} onChange={(e) => s.set({ stepLimit: Math.max(5, Math.min(150, Number(e.target.value) || 60)) })} className={`${inp} h-8`} /></Field>
       </div>
       <Field label="Branch"><input value={s.branch} onChange={(e) => s.set({ branch: e.target.value })} className={`${inp} h-8 font-mono`} placeholder="sakai/fix" /></Field>
       <p className="text-[10.5px] text-faint leading-snug">A step is one model call; the step limit is a cost safety cap. Typical fixes take 10–25. The time limit (3–15 min, default 8) is a hard wall-clock stop; your changes are kept.</p>

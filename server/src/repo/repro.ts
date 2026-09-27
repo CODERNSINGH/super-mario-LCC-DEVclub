@@ -67,7 +67,7 @@ export async function runRepro(root: string, r: Repro): Promise<{ code: number; 
   const path = join(root, file)
   await writeFile(path, r.code + '\n')
   try {
-    const res = await runShell(root, `${r.lang === 'py' ? 'python3' : 'node'} ${file}`, 15_000)
+    const res = await runShell(root, `${r.lang === 'py' ? 'python3' : 'node'} ${file}`, 120_000)
     return { code: res.code, output: res.output.replace(new RegExp(file.replace(/\./g, '\\.'), 'g'), '<repro>').slice(-800).trim() }
   } finally {
     if (existsSync(path)) await unlink(path).catch(() => undefined)
@@ -113,10 +113,10 @@ export async function traceRepro(root: string, r: Repro): Promise<{ code: number
     if (r.lang === 'py') {
       const tracer = join(dir, 'tracer.py')
       await writeFile(tracer, PY_TRACER)
-      res = await runShell(root, `SAKAI_TRACE_OUT='${join(dir, 'trace.json')}' python3 '${tracer}' ${file}`, 20_000)
+      res = await runShell(root, `SAKAI_TRACE_OUT='${join(dir, 'trace.json')}' python3 '${tracer}' ${file}`, 120_000)
       try { for (const f of JSON.parse(readFileSync(join(dir, 'trace.json'), 'utf8')) as ExecutedFn[]) if (f.name !== '<module>' && !f.file.startsWith('.sakai')) executed.push({ ...f, file: relative(real, join(real, f.file)) }) } catch { /* no trace */ }
     } else {
-      res = await runShell(root, `NODE_V8_COVERAGE='${dir}' node ${file}`, 20_000)
+      res = await runShell(root, `NODE_V8_COVERAGE='${dir}' node ${file}`, 120_000)
       for (const f of readdirSync(dir).filter((n) => n.endsWith('.json'))) {
         let data: { result: { url: string; functions: { functionName: string; ranges: { startOffset: number; endOffset: number; count: number }[] }[] }[] }
         try { data = JSON.parse(readFileSync(join(dir, f), 'utf8')) } catch { continue }
