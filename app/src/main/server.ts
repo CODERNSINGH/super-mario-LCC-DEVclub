@@ -8,7 +8,7 @@ let child: ChildProcess | null = null
 
 /** Runs the harness server as a child process using Electron's bundled Node. */
 export async function startServer(): Promise<void> {
-  const entry = app.isPackaged ? join(process.resourcesPath, 'server/index.js') : join(__dirname, '../../../server/dist/index.js')
+  const entry = app.isPackaged ? join(process.resourcesPath, 'server/index.cjs') : join(__dirname, '../../../server/dist/index.js')
   if (!existsSync(entry)) { console.error(`[sakai] server not built: ${entry} (run npm run build -w server)`); return }
   child = spawn(process.execPath, [entry], {
     env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', SAKAI_SERVER_PORT: String(SERVER_PORT()) },
