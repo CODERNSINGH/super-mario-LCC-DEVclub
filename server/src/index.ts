@@ -4,6 +4,7 @@ import { estimate } from './estimate.js'
 import { changedFiles, commitLocal, commitPushPr, createBranch, currentDiff, originalContent } from './git.js'
 import { detectTestCommand, listDir, readRepoFile } from './repo/info.js'
 import { runShell, safePath } from './tools/shell.js'
+import { learn } from './learn.js'
 import { SessionStore } from './agent/session.js'
 import { existsSync, statSync } from 'node:fs'
 import { writeFile } from 'node:fs/promises'
@@ -22,6 +23,12 @@ app.post('/estimate', wrap(async (q, r) => {
   r.json(await estimate(root, issueText, provider, model, withTips ? llm : undefined))
 }))
 
+// Profile-tailored "learn from this fix" card (explanation, student MCQ, risk highlights).
+app.post('/learn', wrap(async (q, r) => {
+  const { llm, profile, issue, diff, summary } = q.body ?? {}
+  if (!llm?.baseUrl || !llm?.model || !diff) { r.status(400).json({ error: 'llm and diff are required' }); return }
+  r.json(await learn({ llm, profile, issue: issue ?? { title: 'Fix' }, diff, summary }))
+}))
 app.post('/tests/detect', wrap(async (q, r) => { r.json({ command: await detectTestCommand(q.body.root) }) }))
 app.post('/fs/list', wrap(async (q, r) => { r.json(await listDir(q.body.root, q.body.path ?? '')) }))
 app.post('/fs/read', wrap(async (q, r) => { r.json({ content: await readRepoFile(q.body.root, q.body.path) }) }))
@@ -45,8 +52,16 @@ const sseHeaders = (res: express.Response) => {
   res.flushHeaders()
 }
 
+/** Audience-specific style for the agent's final summary and chat replies. */
+const PROFILE_NOTE: Record<string, string> = {
+  student: 'Audience: a CS student learning. In your final summary (and any explanation) be brief, name the underlying concept, and explain WHY the bug happened in plain terms.',
+  vibe: 'Audience: a non-technical person. In your final summary use plain everyday words, no jargon, and mention any weakness or risk you noticed (security, missing checks, fragile assumptions).',
+  developer: 'Audience: an experienced developer. Keep the final summary formal and crisp: root cause, the change, verification, edge cases.',
+}
+
 app.post('/session', wrap(async (q, r) => {
-  const { root, llm, mode, issue, notes, testCommand, maxSteps, timeLimitMin, text } = q.body ?? {}
+  const { root, llm, mode, issue, testCommand, maxSteps, timeLimitMin, text, profile } = q.body ?? {}
+  const notes = [q.body?.notes, PROFILE_NOTE[profile as string]].filter(Boolean).join('\n\n') || undefined
   if (!root || !existsSync(root) || !statSync(root).isDirectory()) { r.status(400).json({ error: 'root must be an existing directory' }); return }
   if (!llm?.baseUrl || !llm?.model) { r.status(400).json({ error: 'llm config (baseUrl, model) is required' }); return }
   const m = mode === 'chat' ? 'chat' : 'solve'

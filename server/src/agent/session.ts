@@ -12,6 +12,8 @@ export interface SessionInit {
   maxSteps?: number
   /** Optional whole-run wall-clock limit in minutes. Default: none (per-step watchdog only). */
   timeLimitMin?: number
+  /** Audience for the final summary: developer (default) | student | vibe. */
+  profile?: 'developer' | 'student' | 'vibe'
   /** Test seam: replace the model call. */
   deps?: Partial<SessionState['deps']>
 }
