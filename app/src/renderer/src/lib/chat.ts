@@ -18,7 +18,7 @@ export type Item =
 export interface Usage { inputTokens: number; outputTokens: number; steps: number }
 export interface Chat { sessionId: string | null; mode: 'solve' | 'chat'; items: Item[]; phase: 'idle' | 'running'; usage: Usage; status: string; startedAt: number | null; limitMin: number }
 
-const blank = (): Chat => ({ sessionId: null, mode: 'chat', items: [], phase: 'idle', usage: { inputTokens: 0, outputTokens: 0, steps: 0 }, status: '', startedAt: null, limitMin: 8 })
+const blank = (): Chat => ({ sessionId: null, mode: 'chat', items: [], phase: 'idle', usage: { inputTokens: 0, outputTokens: 0, steps: 0 }, status: '', startedAt: null, limitMin: 0 })
 
 interface Store { chats: Record<string, Chat>; patch: (root: string, f: (c: Chat) => Chat) => void }
 export const useChatStore = create<Store>((set) => ({

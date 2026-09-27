@@ -45,7 +45,7 @@ const fresh = () => ({
   tabs: [{ id: 'welcome', kind: 'welcome', title: 'Welcome' } as Tab], active: 'welcome', dirty: {}, termId: 0,
   ready: false, cloneFailed: false,
   logs: [], debug: [], problems: [], issues: [], picked: null,
-  goal: '', notes: '', testCommand: '', branch: '', stepLimit: 30, timeLimitMin: 8, stats: {}, rev: 0, estimate: null, changed: [],
+  goal: '', notes: '', testCommand: '', branch: '', stepLimit: 30, timeLimitMin: 0, stats: {}, rev: 0, estimate: null, changed: [],
   cursor: { line: 1, col: 1 }, activity: '',
 })
 

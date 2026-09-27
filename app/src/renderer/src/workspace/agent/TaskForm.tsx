@@ -91,7 +91,6 @@ export function TaskForm() {
       <div className="grid grid-cols-[1fr_74px_74px] gap-2.5">
         <Field label="Test command"><input value={s.testCommand} onChange={(e) => s.set({ testCommand: e.target.value })} className={`${inp} h-8 font-mono`} placeholder="npm test" /></Field>
         <Field label="Step limit"><input type="number" min={5} max={100} value={s.stepLimit} onChange={(e) => s.set({ stepLimit: Math.max(5, Math.min(100, Number(e.target.value) || 30)) })} className={`${inp} h-8`} /></Field>
-        <Field label="Time limit (min)"><input type="number" min={3} max={15} value={s.timeLimitMin} onChange={(e) => s.set({ timeLimitMin: Math.max(3, Math.min(15, Number(e.target.value) || 8)) })} className={`${inp} h-8`} /></Field>
       </div>
       <Field label="Branch"><input value={s.branch} onChange={(e) => s.set({ branch: e.target.value })} className={`${inp} h-8 font-mono`} placeholder="sakai/fix" /></Field>
       <p className="text-[10.5px] text-faint leading-snug">A step is one model call; the step limit is a cost safety cap. Typical fixes take 10–25. The time limit (3–15 min, default 8) is a hard wall-clock stop; your changes are kept.</p>

@@ -25,7 +25,10 @@ monaco.editor.defineTheme('sakai', {
     'editor.lineHighlightBackground': '#131316', 'editorLineNumber.foreground': '#4a4a52', 'editorLineNumber.activeForeground': '#d8d8da',
     'editor.selectionBackground': '#bc002d55', 'editorCursor.foreground': '#bc002d',
     'editorWidget.background': '#111113', 'editorWidget.border': '#1f1f23',
-    'diffEditor.insertedTextBackground': '#1f8f4a26', 'diffEditor.removedTextBackground': '#bc002d33',
+    'diffEditor.insertedTextBackground': '#2ea04366', 'diffEditor.removedTextBackground': '#e5484d66',
+    'diffEditor.insertedLineBackground': '#2ea04326', 'diffEditor.removedLineBackground': '#e5484d26',
+    'diffEditorGutter.insertedLineBackground': '#2ea04355', 'diffEditorGutter.removedLineBackground': '#e5484d55',
+    'diffEditor.border': '#1f1f23', 'diffEditor.diagonalFill': '#1f1f23',
     'scrollbarSlider.background': '#26262b80',
   },
 })

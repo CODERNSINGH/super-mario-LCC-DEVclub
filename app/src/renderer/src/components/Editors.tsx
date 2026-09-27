@@ -71,10 +71,51 @@ export function FileView({ path }: { path: string }) {
 export function DiffView({ path }: { path: string }) {
   const root = useApp((s) => s.localPath)!
   const [pair, setPair] = useState<[string, string] | null>(null)
+  const [stat, setStat] = useState<{ add: number; del: number; hunks: number }>({ add: 0, del: 0, hunks: 0 })
+  const [cur, setCur] = useState(0)
+  const [inline, setInline] = useState(false)
+  const ed = useRef<import('monaco-editor').editor.IStandaloneDiffEditor | null>(null)
   const rev = useSession((s) => s.rev)
   useEffect(() => {
     void Promise.all([post<{ content: string }>('/git/original', { root, path }), post<{ content: string }>('/fs/read', { root, path }).catch(() => ({ content: '' }))]).then(([a, b]) => setPair([a.content, b.content]))
   }, [root, path, rev])
+
+  const measure = () => {
+    const changes = ed.current?.getLineChanges() ?? []
+    setStat({
+      hunks: changes.length,
+      add: changes.reduce((n, c) => n + (c.modifiedEndLineNumber === 0 ? 0 : c.modifiedEndLineNumber - c.modifiedStartLineNumber + 1), 0),
+      del: changes.reduce((n, c) => n + (c.originalEndLineNumber === 0 ? 0 : c.originalEndLineNumber - c.originalStartLineNumber + 1), 0),
+    })
+  }
+  const go = (dir: 'next' | 'previous') => { ed.current?.goToDiff(dir); setCur((c) => Math.max(1, Math.min(stat.hunks, c + (dir === 'next' ? 1 : -1)))) }
+
   if (!pair) return <div className="p-6 text-muted">Loading diff…</div>
-  return <DiffEditor theme="sakai" language={langFor(path)} original={pair[0]} modified={pair[1]} keepCurrentOriginalModel keepCurrentModifiedModel options={{ ...opts, readOnly: true, renderSideBySide: true, minimap: { enabled: false } }} />
+  const btn = 'h-6 px-2 rounded border border-line hover:border-sakai text-[11px] text-fg'
+  return (
+    <div className="h-full flex flex-col">
+      <div className="h-8 shrink-0 px-3 flex items-center gap-3 border-b border-line bg-panel text-[12px]">
+        <span className="font-mono text-ink truncate">{path}</span>
+        <span className="font-mono text-[#3fb950] font-semibold">+{stat.add}</span>
+        <span className="font-mono text-[#e5484d] font-semibold">−{stat.del}</span>
+        <span className="text-muted">{stat.hunks} {stat.hunks === 1 ? 'change' : 'changes'}</span>
+        <span className="flex-1" />
+        <button className={btn} onClick={() => go('previous')} title="Previous change (⇧F3)">↑ Prev</button>
+        <button className={btn} onClick={() => go('next')} title="Next change (F3)">↓ Next{stat.hunks ? ` (${Math.min(cur + 1, stat.hunks)}/${stat.hunks})` : ''}</button>
+        <button className={btn} onClick={() => setInline((v) => !v)}>{inline ? 'Side by side' : 'Inline'}</button>
+      </div>
+      <div className="flex-1 min-h-0">
+        <DiffEditor
+          theme="sakai" language={langFor(path)} original={pair[0]} modified={pair[1]} keepCurrentOriginalModel keepCurrentModifiedModel
+          options={{ ...opts, readOnly: true, renderSideBySide: !inline, useInlineViewWhenSpaceIsLimited: false, renderSideBySideInlineBreakpoint: 200, renderIndicators: true, ignoreTrimWhitespace: false, minimap: { enabled: false }, hideUnchangedRegions: { enabled: false } }}
+          onMount={(e) => {
+            ed.current = e
+            // Jump to the first change as soon as the diff is computed, so the user lands on what changed.
+            const d = e.onDidUpdateDiff(() => { measure(); setCur(1); if ((e.getLineChanges() ?? []).length) e.revealFirstDiff(); })
+            e.onDidDispose(() => d.dispose())
+          }}
+        />
+      </div>
+    </div>
+  )
 }
