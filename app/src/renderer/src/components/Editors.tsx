@@ -7,6 +7,24 @@ import { useApp } from '../store'
 import { useSession } from '../lib/session'
 import { invalidateFiles } from '../lib/files'
 import { refreshChanges } from '../lib/diff'
+import { useHighlights } from '../lib/learn'
+
+/** Decorations for lines containing any highlight term (brand-red wavy underline + gutter bar). */
+function hlDecos(model: import('monaco-editor').editor.ITextModel, terms: string[], only?: number[]): import('monaco-editor').editor.IModelDeltaDecoration[] {
+  const out: import('monaco-editor').editor.IModelDeltaDecoration[] = []
+  const ts = terms.filter((t) => t.trim().length > 2)
+  if (!ts.length) return out
+  const lines = only ?? Array.from({ length: model.getLineCount() }, (_, i) => i + 1)
+  for (const l of lines) {
+    if (l > model.getLineCount()) continue
+    const text = model.getLineContent(l)
+    const t = ts.find((x) => text.includes(x.trim()))
+    if (!t) continue
+    const c = text.indexOf(t.trim()) + 1
+    out.push({ range: { startLineNumber: l, startColumn: c, endLineNumber: l, endColumn: c + t.trim().length }, options: { inlineClassName: 'sk-hl-text', className: 'sk-hl-line', linesDecorationsClassName: 'sk-hl-gutter', hoverMessage: { value: 'Sakai flagged this line' } } })
+  }
+  return out
+}
 
 const opts = {
   fontSize: 13, fontFamily: '"SF Mono", Menlo, monospace', fontLigatures: false,
@@ -24,6 +42,8 @@ export function FileView({ path }: { path: string }) {
   const rev = useSession((s) => s.rev)
   const stat = useSession((s) => s.stats[path])
   const decos = useRef<string[]>([])
+  const hl = useHighlights((s) => s.terms)
+  const hlDec = useRef<string[]>([])
   useEffect(() => { void post<{ content: string }>('/fs/read', { root, path }).then((r) => {
     if (ed.current) { if (!useSession.getState().dirty[id] && ed.current.getValue() !== r.content) ed.current.setValue(r.content) } else setContent(r.content)
   }).catch((e) => { if (!ed.current) setContent(`// ${e.message}`) }) }, [root, path, rev, id])
@@ -36,6 +56,11 @@ export function FileView({ path }: { path: string }) {
     for (const l of new Set(stat?.removedAt ?? [])) list.push({ range: { startLineNumber: Math.min(l, n), startColumn: 1, endLineNumber: Math.min(l, n), endColumn: 1 }, options: { isWholeLine: true, className: 'sk-del-mark', linesDecorationsClassName: 'sk-del-gutter', hoverMessage: { value: 'Lines removed here' } } })
     decos.current = e.deltaDecorations(decos.current, list)
   }, [stat, content, rev])
+  useEffect(() => {
+    const e = ed.current, m = e?.getModel()
+    if (!e || !m) return
+    hlDec.current = e.deltaDecorations(hlDec.current, hlDecos(m, hl, stat?.added))
+  }, [hl, stat, content, rev])
 
   const save = async () => {
     if (!ed.current) return
@@ -76,6 +101,10 @@ export function DiffView({ path }: { path: string }) {
   const [inline, setInline] = useState(false)
   const ed = useRef<import('monaco-editor').editor.IStandaloneDiffEditor | null>(null)
   const rev = useSession((s) => s.rev)
+  const hl = useHighlights((s) => s.terms)
+  const hlDec = useRef<string[]>([])
+  const applyHl = () => { const m = ed.current?.getModifiedEditor(); const mod = m?.getModel(); if (m && mod) hlDec.current = m.deltaDecorations(hlDec.current, hlDecos(mod, hl)) }
+  useEffect(applyHl, [hl, pair]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     void Promise.all([post<{ content: string }>('/git/original', { root, path }), post<{ content: string }>('/fs/read', { root, path }).catch(() => ({ content: '' }))]).then(([a, b]) => setPair([a.content, b.content]))
   }, [root, path, rev])
@@ -111,7 +140,7 @@ export function DiffView({ path }: { path: string }) {
           onMount={(e) => {
             ed.current = e
             // Jump to the first change as soon as the diff is computed, so the user lands on what changed.
-            const d = e.onDidUpdateDiff(() => { measure(); setCur(1); if ((e.getLineChanges() ?? []).length) e.revealFirstDiff(); })
+            const d = e.onDidUpdateDiff(() => { measure(); applyHl(); setCur(1); if ((e.getLineChanges() ?? []).length) e.revealFirstDiff(); })
             e.onDidDispose(() => d.dispose())
           }}
         />

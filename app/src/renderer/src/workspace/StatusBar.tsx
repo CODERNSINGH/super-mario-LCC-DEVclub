@@ -3,6 +3,7 @@ import { useApp } from '../store'
 import { useSession } from '../lib/session'
 import { useChat } from '../lib/chat'
 import { langFor } from '../lib/monaco'
+import { ProfileChip } from '../ui/ProfilePicker'
 import * as A from '../lib/actions'
 
 const LANG: Record<string, string> = { typescript: 'TypeScript', javascript: 'JavaScript', json: 'JSON', markdown: 'Markdown', python: 'Python', plaintext: 'Plain Text', css: 'CSS', html: 'HTML', yaml: 'YAML', shell: 'Shell Script', go: 'Go', rust: 'Rust', java: 'Java' }
@@ -22,6 +23,7 @@ export function StatusBar() {
       {chat.phase === 'running' && <button className={`${cell} bg-black/20`} onClick={() => A.showPanel('output')}><Loader2 size={12} className="spin" /><span className="max-w-[320px] truncate">{s.activity || 'Sakai is working…'}</span></button>}
       <div className="flex-1" />
       {isFile && <><span className={cell}>Ln {s.cursor.line}, Col {s.cursor.col}</span><span className={cell}>Spaces: 2</span><span className={cell}>UTF-8</span><span className={cell}>LF</span><span className={cell}>{`{ } ${LANG[langFor(tab!.path!)] ?? 'Plain Text'}`}</span></>}
+      <ProfileChip cell={cell} />
       <button className={cell} title="Change Model" onClick={A.changeModel}><Sparkles size={12} />{llm?.provider} · {llm?.model}</button>
       <button className={cell} title="Notifications"><Bell size={13} /></button>
     </footer>

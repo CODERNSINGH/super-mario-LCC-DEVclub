@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useApp } from '../store'
+import { useApp, PROFILES } from '../store'
 import { useSession } from '../lib/session'
 import { allFiles } from '../lib/files'
 import { runInTerminal, useQuick } from '../lib/quick'
@@ -35,6 +35,8 @@ export function CommandPalette() {
     if (cmdMode) {
       const all = [
         ...Object.entries(menus).flatMap(([m, list]) => list.filter((x) => x.action && !x.disabled).map((x) => ({ label: `${m}: ${x.label.replace(/…$/, '')}`, hint: x.shortcut, run: x.action! }))),
+        ...PROFILES.map((p) => ({ label: `Profile: ${p.name}`, hint: useApp.getState().profile === p.id ? 'current' : '', run: () => useApp.getState().setProfile(p.id) })),
+        { label: 'Learning pop-ups: Toggle', hint: '', run: () => useApp.getState().setTipsOn(!useApp.getState().tipsOn) },
         ...quick.map((c) => ({ label: `Run: ${c.name}`, hint: c.command, run: () => runInTerminal(s.set, s.termId, c.command) })),
       ]
       const seen = new Set<string>()

@@ -1,10 +1,10 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
-import logo from '../assets/logo.png'
+import { Mascot } from '../ui/Mascot'
 
 export function Logo({ size = 28, text = true }: { size?: number; text?: boolean }) {
   return (
     <div className="flex items-center gap-2.5">
-      <img src={logo} width={size} height={size} alt="" className="select-none" draggable={false} />
+      <Mascot size={size} />
       {text && <span className="text-ink text-[15px] font-semibold tracking-wide">Sakai</span>}
     </div>
   )

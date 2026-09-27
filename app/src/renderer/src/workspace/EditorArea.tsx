@@ -6,7 +6,9 @@ import { FileIcon } from '../ui/icons'
 import { Button } from '../components/ui'
 import * as A from '../lib/actions'
 import { getRecent, clearRecent } from '../lib/recent'
-import logo from '../assets/logo.png'
+import { Mascot } from '../ui/Mascot'
+import { ProfilePicker } from '../ui/ProfilePicker'
+import { TipToast } from './Tips'
 
 function Breadcrumbs({ path, diff }: { path: string; diff?: boolean }) {
   const { repo, localPath } = useApp()
@@ -24,7 +26,7 @@ function Watermark() {
   return (
     <div className="h-full grid place-items-center">
       <div className="flex flex-col items-center opacity-90">
-        <img src={logo} width={120} height={120} alt="" className="opacity-25 grayscale" draggable={false} />
+        <Mascot size={120} className="opacity-40" />
         <div className="mt-6 space-y-2">{rows.map(([l, k, ic]) => <div key={l} className="flex items-center gap-6 text-[12.5px] text-muted"><span className="w-44 flex items-center gap-2">{ic}{l}</span><span className="kbd">{k}</span></div>)}</div>
       </div>
     </div>
@@ -44,7 +46,7 @@ function Welcome() {
   return (
     <div className="h-full overflow-auto">
       <div className="max-w-[860px] mx-auto px-10 py-10 fade">
-        <div className="flex items-center gap-5"><img src={logo} width={84} height={84} alt="" className="float" /><div><h1 className="text-[30px] font-semibold text-ink tracking-tight">Sakai</h1><p className="text-muted text-[14px]">An autonomous engineer for your repository{repo ? ` — ${repo}` : localPath ? ` — ${localPath.split('/').pop()}` : ''}</p></div></div>
+        <div className="flex items-center gap-5"><Mascot size={96} /><div><h1 className="text-[30px] font-semibold text-ink tracking-tight">Sakai</h1><p className="text-muted text-[14px]">An autonomous engineer for your repository{repo ? ` — ${repo}` : localPath ? ` — ${localPath.split('/').pop()}` : ''}</p></div></div>
         <div className="mt-8 grid grid-cols-[1.2fr_1fr] gap-10">
           <div>
             <h2 className="text-[13px] font-semibold text-ink mb-3">Start</h2>
@@ -71,7 +73,7 @@ function Welcome() {
 }
 
 function SettingsTab() {
-  const { user, llm, repo, localPath, set } = useApp()
+  const { user, llm, repo, localPath, set, tipsOn, setTipsOn } = useApp()
   const s = useSession()
   const row = (k: string, v: string, action?: React.ReactNode) => <div className="flex items-center gap-4 py-3 border-b border-line"><div className="w-40 text-muted text-[12.5px]">{k}</div><div className="flex-1 text-ink text-[13px] break-all selectable">{v}</div>{action}</div>
   return (
@@ -81,6 +83,8 @@ function SettingsTab() {
       {row('Repository', repo ?? '—')}
       {row('Local path', localPath ?? '—')}
       {row('Model', llm ? `${llm.provider} · ${llm.model}` : '—', <Button variant="ghost" className="h-7 text-xs" onClick={A.changeModel}>Change</Button>)}
+      <div className="py-3 border-b border-line"><div className="text-muted text-[12.5px] mb-2">Who's coding today?</div><ProfilePicker compact /></div>
+      {row('Learning pop-ups', tipsOn ? 'On — short tips while Sakai works.' : 'Off', <Button variant="ghost" className="h-7 text-xs" onClick={() => setTipsOn(!tipsOn)}>{tipsOn ? 'Turn off' : 'Turn on'}</Button>)}
       {row('Default step limit', String(s.stepLimit))}
       {row('Layout', 'Panel sizes are saved automatically.', <Button variant="ghost" className="h-7 text-xs" onClick={() => { try { localStorage.removeItem('sakai.layout') } catch { /* ignore */ } s.set({ sideW: 264, agentW: 400, panelH: 220 }) }}>Reset</Button>)}
       <p className="mt-6 text-[12px] text-muted leading-relaxed">API keys and your GitHub token are stored encrypted in the macOS Keychain. Model usage is billed by your provider.</p>
@@ -90,6 +94,7 @@ function SettingsTab() {
 
 export function EditorArea() {
   const s = useSession()
+  const root = useApp((a) => a.localPath)
   const tab = s.tabs.find((t) => t.id === s.active)
   return (
     <div className="flex-1 min-h-0 min-w-0 flex flex-col bg-bg">
@@ -99,7 +104,7 @@ export function EditorArea() {
           return (
             <div key={t.id} onClick={() => s.set({ active: t.id })} onAuxClick={() => s.closeTab(t.id)} className={`group relative h-full pl-3 pr-1.5 flex items-center gap-2 border-r border-line text-[13px] shrink-0 cursor-default ${on ? 'bg-bg text-ink' : 'text-muted hover:text-fg'}`}>
               {on && <span className="absolute top-0 left-0 right-0 h-[2px] bg-sakai" />}
-              {t.kind === 'welcome' ? <img src={logo} width={15} height={15} alt="" /> : t.kind === 'settings' ? <span className="text-[11px]">⚙</span> : <FileIcon name={t.title.replace(/ \(.*\)$/, '')} />}
+              {t.kind === 'welcome' ? <Mascot size={16} animate={false} /> : t.kind === 'settings' ? <span className="text-[11px]">⚙</span> : <FileIcon name={t.title.replace(/ \(.*\)$/, '')} />}
               <span className={t.kind === 'diff' ? 'italic' : ''}>{t.title}</span>
               {t.kind === 'diff' && <span title="Changed by Sakai — live diff" className="w-1.5 h-1.5 rounded-full bg-add" />}
               <button onClick={(e) => { e.stopPropagation(); s.closeTab(t.id) }} className={`w-5 h-5 grid place-items-center rounded hover:bg-line2 ${s.dirty[t.id] ? '' : on ? '' : 'opacity-0 group-hover:opacity-100'}`}>
@@ -112,6 +117,7 @@ export function EditorArea() {
       {tab && (tab.kind === 'file' || tab.kind === 'diff') && <Breadcrumbs path={tab.path!} diff={tab.kind === 'diff'} />}
       <div className="flex-1 min-h-0 relative">
         {!tab ? <Watermark /> : tab.kind === 'welcome' ? <Welcome /> : tab.kind === 'settings' ? <SettingsTab /> : tab.kind === 'file' ? <FileView key={tab.id} path={tab.path!} /> : <DiffView key={tab.id} path={tab.path!} />}
+        <TipToast root={root} />
       </div>
     </div>
   )

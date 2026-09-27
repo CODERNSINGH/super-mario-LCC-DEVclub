@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { post, resolveLlm, sessionUrl } from './api'
 import { useSession } from './session'
-import { useApp } from '../store'
+import { useApp, PROFILES } from '../store'
 import { onAgentEdit, refreshChanges } from './diff'
 
 export interface ToolCall { tool: string; args: Record<string, string> }
@@ -161,7 +161,7 @@ export interface StartOpts { issue?: { number?: number; title: string; body: str
 /** Creates a session ('solve' for an issue/task, 'chat' for conversation) and attaches to its event stream. */
 export async function startSession(root: string, mode: 'solve' | 'chat', o: StartOpts = {}): Promise<string> {
   const llm = await resolveLlm()
-  const { id } = await post<{ id: string }>('/session', { root, llm, mode, timeLimitMin: useSession.getState().timeLimitMin, ...o }, true)
+  const { id } = await post<{ id: string }>('/session', { root, llm, mode, profile: PROFILES.find((p) => p.id === useApp.getState().profile)?.api, timeLimitMin: useSession.getState().timeLimitMin, ...o }, true)
   useChatStore.getState().patch(root, () => ({ ...blank(), mode, sessionId: id, phase: 'running', startedAt: Date.now(), limitMin: o.timeLimitMin ?? useSession.getState().timeLimitMin,
     items: o.issue ? [{ kind: 'task', id: nid(), title: o.issue.title, body: o.issue.body, number: o.issue.number }] : [] }))
   void attach(root, id)

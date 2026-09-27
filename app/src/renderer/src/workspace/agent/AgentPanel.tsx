@@ -7,8 +7,9 @@ import { TaskForm } from './TaskForm'
 import { Composer } from './Composer'
 import { AiBubble, UserBubble, ToolCard, TaskCard, ErrorCard, ResultCard, PhaseRow } from './Cards'
 import { Md } from './Md'
+import { LearnCard } from './LearnCard'
 import * as A from '../../lib/actions'
-import logo from '../../assets/logo.png'
+import { Mascot } from '../../ui/Mascot'
 
 const fmt = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : String(n))
 
@@ -19,7 +20,7 @@ function Empty({ root }: { root: string | null }) {
   const chip = (icon: React.ReactNode, label: string, fn: () => void) => <button onClick={fn} disabled={!root} className="w-full flex items-center gap-2.5 h-9 px-3 rounded-lg border border-line bg-panel hover:border-sakai/70 hover:bg-raised text-left text-[12.5px] text-fg disabled:opacity-40"><span className="text-sakai">{icon}</span>{label}</button>
   return (
     <div className="h-full flex flex-col items-center justify-center px-6 text-center fade">
-      <img src={logo} width={64} height={64} alt="" className="float" />
+      <Mascot size={76} />
       <h3 className="mt-3 text-ink text-[15px] font-semibold">How can I help with {name}?</h3>
       <p className="mt-1 text-[12px] text-muted max-w-[280px]">Ask about the code, or hand me a bug. I’ll edit, run your tests and show every step.</p>
       <div className="mt-5 w-full max-w-[300px] space-y-2">
@@ -38,7 +39,7 @@ function Empty({ root }: { root: string | null }) {
   )
 }
 
-function Transcript({ items, phase }: { items: Item[]; phase: 'idle' | 'running' }) {
+function Transcript({ items, phase, root }: { items: Item[]; phase: 'idle' | 'running'; root: string | null }) {
   const box = useRef<HTMLDivElement>(null)
   const [stick, setStick] = useState(true)
   const last = items[items.length - 1]
@@ -57,7 +58,7 @@ function Transcript({ items, phase }: { items: Item[]; phase: 'idle' | 'running'
           : it.kind === 'tool' ? <ToolCard key={it.id} t={it} />
           : it.kind === 'phase' ? <PhaseRow key={it.id} label={it.label} />
           : it.kind === 'error' ? <ErrorCard key={it.id} text={it.text} />
-          : it.kind === 'result' ? (it.id === lastResult ? <ResultCard key={it.id} finished={it.finished} summary={it.summary} /> : <div key={it.id} className="text-[11.5px] text-muted pl-8">Turn finished.</div>)
+          : it.kind === 'result' ? (it.id === lastResult ? <div key={it.id} className="space-y-3"><ResultCard finished={it.finished} summary={it.summary} />{it.finished && root && items.some((x) => x.kind === 'task') && <LearnCard root={root} items={items} />}</div> : <div key={it.id} className="text-[11.5px] text-muted pl-8">Turn finished.</div>)
           : <div key={it.id} className="text-[12px] text-muted pl-8"><Md text={it.text} /></div>)}
         {phase === 'running' && last?.kind !== 'ai' && <div className="flex items-center gap-2 pl-8 text-[12px] text-muted"><Loader2 size={13} className="spin text-sakai" />working…</div>}
       </div>
@@ -96,7 +97,7 @@ export function AgentPanel() {
   return (
     <aside className="h-full flex flex-col bg-panel border-l border-line min-w-0">
       <div className="h-9 shrink-0 px-3 flex items-center gap-2 border-b border-line">
-        <img src={logo} width={16} height={16} alt="" />
+        <Mascot size={20} animate={false} />
         <span className="text-[11px] uppercase tracking-wider text-fg">Sakai Agent</span>
         {chat.phase === 'running' && <span className="text-[10px] text-sakai uppercase tracking-wider">● live</span>}
         <span className="ml-auto flex items-center gap-0.5 text-muted">
@@ -106,7 +107,7 @@ export function AgentPanel() {
       </div>
       {s.agentView === 'task' ? <div className="flex-1 min-h-0"><TaskForm /></div> : (
         <>
-          {chat.items.length === 0 ? <div className="flex-1 min-h-0"><Empty root={root} /></div> : <Transcript items={chat.items} phase={chat.phase} />}
+          {chat.items.length === 0 ? <div className="flex-1 min-h-0"><Empty root={root} /></div> : <Transcript items={chat.items} phase={chat.phase} root={root} />}
           {chat.phase === 'running' && root && <WorkingBar root={root} />}
           <Composer running={chat.phase === 'running'} />
         </>

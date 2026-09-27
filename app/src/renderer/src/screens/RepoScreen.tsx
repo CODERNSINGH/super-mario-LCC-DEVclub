@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { FolderOpen, FlaskConical, ArrowRight, TriangleAlert } from 'lucide-react'
 import { useApp } from '../store'
 import { Onboard } from '../components/Onboard'
+import { ProfilePicker } from '../ui/ProfilePicker'
 import { Button } from '../components/ui'
 import { GithubMark } from '../ui/brand'
 import { getRecent } from '../lib/recent'
@@ -38,6 +39,7 @@ export function RepoScreen() {
           <span>{!sys.git ? <>Git isn’t installed. Open Terminal and run <span className="font-mono text-ink">xcode-select --install</span>, then reopen Sakai.</> : 'You appear to be offline — GitHub and hosted models need a connection (local folders and Ollama still work).'}</span>
         </div>
       )}
+      <div className="mb-5"><div className="text-[11px] uppercase tracking-widest text-faint mb-2 text-center">Who's coding today?</div><ProfilePicker /></div>
       <div className="flex gap-2">
         <div className="flex-1 flex items-center gap-2 h-11 px-3 rounded-lg bg-panel border border-line focus-within:border-sakai transition-colors">
           <span className="text-muted"><GithubMark size={16} /></span>

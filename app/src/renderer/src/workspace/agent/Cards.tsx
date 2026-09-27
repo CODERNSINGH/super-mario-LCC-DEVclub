@@ -10,7 +10,7 @@ import * as A from '../../lib/actions'
 import { openAllDiffs, refreshChanges } from '../../lib/diff'
 import { sendMessage } from '../../lib/chat'
 import { Md } from './Md'
-import logo from '../../assets/logo.png'
+import { Mascot } from '../../ui/Mascot'
 
 type Tool = Extract<Item, { kind: 'tool' }>
 const isTestCmd = (c: string) => /\b(test|jest|vitest|pytest|cargo test|go test|mvn|gradle|rspec)\b/.test(c)
@@ -105,7 +105,7 @@ export function Thinking({ text, streaming }: { text: string; streaming: boolean
 export function AiBubble({ it }: { it: Extract<Item, { kind: 'ai' }> }) {
   return (
     <div className="flex gap-2.5 fade">
-      <img src={logo} width={22} height={22} alt="" className="shrink-0 mt-0.5 self-start object-contain" style={{ width: 22, height: 22 }} />
+      <Mascot size={24} animate={false} className="mt-0.5 self-start" />
       <div className="min-w-0 flex-1 space-y-2">
         {it.thinking && <Thinking text={it.thinking} streaming={it.streaming && !it.text} />}
         {(it.text || it.streaming) && <div className="relative"><Md text={it.text} />{it.streaming && <span className="inline-block w-[7px] h-[14px] bg-sakai align-[-2px] ml-0.5 animate-pulse" />}</div>}
