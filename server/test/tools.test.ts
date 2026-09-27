@@ -123,3 +123,11 @@ test('ensureBranch never fails on a dirty tree and never reuses a stale branch',
   assert.equal(readFileSync(join(root, 'f.txt'), 'utf8'), 'new local edit')
   assert.equal(await ensureBranch(root, 'sakai/fix'), 'sakai/fix-2') // idempotent for the same run
 })
+
+test('protected files: manifests, lockfiles and build config cannot be edited by the agent', async () => {
+  const { isProtectedPath, execute } = await import('../src/tools/index.js')
+  for (const p of ['package.json', 'sub/package-lock.json', '.babelrc', 'jest.config.js', 'tsconfig.json', 'requirements.txt']) assert.ok(isProtectedPath(p), p)
+  for (const p of ['src/calculator.js', 'src/package_utils.js', 'tests/a.test.js', 'README.md']) assert.ok(!isProtectedPath(p), p)
+  assert.match(await execute('/tmp', { tool: 'replace', args: { path: 'package.json', old: 'a', new: 'b' } }), /protected/)
+  assert.match(await execute('/tmp', { tool: 'write_file', args: { path: '.babelrc', content: '{}' } }), /protected/)
+})

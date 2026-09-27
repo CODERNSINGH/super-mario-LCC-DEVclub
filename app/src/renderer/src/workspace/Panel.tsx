@@ -27,7 +27,7 @@ export function Panel() {
         ))}</div>
         <span className="ml-auto flex items-center gap-1 text-muted shrink-0">
           {s.cloneFailed && <button onClick={() => window.dispatchEvent(new Event('sakai:retry'))} className="h-5 px-2 mr-1 rounded bg-sakai text-ink text-[11px] normal-case tracking-normal">Retry</button>}
-          {(s.panel === 'output' || s.panel === 'debug' || s.panel === 'problems') && <button title="Clear" onClick={clear} className="h-6 px-1.5 flex items-center gap-1 text-[11px] hover:text-ink"><Trash2 size={12} />Clear</button>}
+          {(s.panel === 'output' || s.panel === 'debug' || s.panel === 'problems') && <button title="Clear" onClick={clear} className="h-6 px-1.5 flex items-center gap-1 text-[11px] hover:text-ink"><Trash2 size={12} /></button>}
           {s.panel === 'terminal' && <button title="New Terminal" onClick={A.openTerminal} className="w-6 h-6 grid place-items-center hover:text-ink"><Plus size={14} /></button>}
           <button title={s.panelMax ? 'Restore Panel Size' : 'Maximize Panel Size'} onClick={() => s.set({ panelMax: !s.panelMax })} className="w-6 h-6 grid place-items-center hover:text-ink">{s.panelMax ? <Minimize2 size={13} /> : <Maximize2 size={13} />}</button>
           <button title="Close Panel" onClick={() => s.set({ panelOpen: false, panelMax: false })} className="w-6 h-6 grid place-items-center hover:text-ink"><X size={14} /></button>

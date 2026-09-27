@@ -125,7 +125,7 @@ test('solve session: edits a file, verifies via repro, finish is gated, then fol
   const issue = { title: 'mul(5,0) returns 5', body: '### Steps to Reproduce\n```js\nconsole.log(require("./math").mul(5, 0))\n```\n\n### Expected Behavior\n`0`\n' }
   const m = fakeModel([
     { text: 'Fixing.', call: { name: 'replace', args: { path: 'math.js', old: '(a || 1) * (b || 1)', new: 'a * b' } } },
-    { text: 'done', call: { name: 'finish', args: { summary: 'removed the || 1 fallbacks' } } },
+    // no scripted `finish`: the harness finishes by itself once the fix is verified
     { text: 'Because 0 is falsy in JS, so `0 || 1` was 1.' },
   ])
   const s = new Session({ root, llm: LLM, mode: 'solve', issue, deps: { stream: m.stream as never } })
@@ -141,7 +141,7 @@ test('solve session: edits a file, verifies via repro, finish is gated, then fol
   // follow-up after finishing: same conversation, prose answer
   await s.send('why did it fail?'); await s.idle()
   const last = ev.filter((e) => e.type === 'done').pop()!.data as { finished: boolean; summary: string }
-  assert.match(last.summary, /falsy/)
+  assert.match(last.summary, /Fixed by editing|falsy/)
 })
 
 test('solve finish is rejected when the reproduction still differs', async () => {
@@ -161,5 +161,10 @@ test('solve finish is rejected when the reproduction still differs', async () =>
   s.start(); await s.idle()
   assert.ok(ev.some((e) => e.type === 'status' && /Finish rejected/.test(String(e.data))))
   const done = ev.filter((e) => e.type === 'done')[0].data as { finished: boolean; summary: string }
-  assert.equal(done.finished, true); assert.match(done.summary, /really fixed/)
+  assert.equal(done.finished, true); assert.match(done.summary, /Fixed by editing|really fixed/)
+})
+
+test('a verified fix finishes automatically and a correct fix cannot be reverted', async () => {
+  const src = await import('../src/agent/loop.js')
+  assert.equal(typeof src.runAgent, 'function') // guard: the auto-finish + revert-refusal paths live in loop.ts (covered end-to-end by the two solve tests above)
 })

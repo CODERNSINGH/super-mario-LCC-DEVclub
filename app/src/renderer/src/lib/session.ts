@@ -25,7 +25,7 @@ interface Session {
   composerText: string
   ready: boolean; cloneFailed: boolean
   logs: LogLine[]; debug: string[]; problems: Problem[]
-  issues: Issue[]; picked: Issue | null
+  issues: Issue[]; picked: Issue | null; solving: number | null
   goal: string; notes: string; testCommand: string; branch: string; stepLimit: number; timeLimitMin: number
   stats: Record<string, FileStat>; rev: number
   estimate: Estimate | null
@@ -44,7 +44,7 @@ interface Session {
 const fresh = () => ({
   tabs: [{ id: 'welcome', kind: 'welcome', title: 'Welcome' } as Tab], active: 'welcome', dirty: {}, termId: 0,
   ready: false, cloneFailed: false,
-  logs: [], debug: [], problems: [], issues: [], picked: null,
+  logs: [], debug: [], problems: [], issues: [], picked: null, solving: null,
   goal: '', notes: '', testCommand: '', branch: '', stepLimit: 30, timeLimitMin: 0, stats: {}, rev: 0, estimate: null, changed: [],
   cursor: { line: 1, col: 1 }, activity: '',
 })

@@ -170,6 +170,14 @@ async function verify(st: SessionState, io: TurnIO): Promise<string> {
   return `[Sakai verification after your edit]\n${parts.join('\n')}`
 }
 
+/** True when the last verification proves the fix: repro matches (or, without a repro, previously failing tests now all pass) and nothing is newly broken. */
+function verifiedFixed(st: SessionState): boolean {
+  const v = st.lastVerify
+  if (!v || v.version !== st.editVersion || v.comparison?.broken.length) return false
+  if (v.verdict === 'match') return true
+  return !st.repro && !!v.comparison && v.comparison.allPass && v.comparison.fixed.length > 0
+}
+
 /** Server-side review replacing an extra model turn: returns problems that block finishing. */
 async function finishProblems(st: SessionState, io: TurnIO, turnStartVersion: number): Promise<string[]> {
   const edited = st.editVersion > turnStartVersion
@@ -275,6 +283,10 @@ export async function runTurn(st: SessionState, io: TurnIO, kind: 'work' | 'foll
 
     let out: string
     const a = call.args
+    if (call.tool === 'revert' && st.mode === 'solve' && verifiedFixed(st)) {
+      out = '[Sakai: refused. Your last edit already PASSED verification, so reverting would undo a correct fix. Call finish now with a short summary.]'
+      io.emit({ type: 'tool', data: { call, out } }); messages.push({ role: 'user', content: out }); continue
+    }
     const readKey = call.tool === 'read_file' ? `${a.path}:${a.start ?? ''}:${a.end ?? ''}:${st.editVersion}` : ''
     if (readKey && reads.has(readKey) && step - reads.get(readKey)! <= 6) {
       out = '[Sakai: you already read exactly this range a moment ago and the file has not changed; the content is earlier in this conversation. Use it: fix the bug with "replace", or read a different range.]'
@@ -296,6 +308,18 @@ export async function runTurn(st: SessionState, io: TurnIO, kind: 'work' | 'foll
     }
     io.emit({ type: 'tool', data: { call, out, ...(edit ? { edit } : {}) } })
     messages.push({ role: 'user', content: out })
+
+    // Auto-finish: once verification proves the fix, don't leave completion to the model (weak models undo good fixes).
+    if (kind === 'work' && st.mode === 'solve' && EDIT_TOOLS.includes(call.tool) && out.startsWith('OK') && verifiedFixed(st)) {
+      const problems = await finishProblems(st, io, turnStartVersion)
+      if (!problems.length) {
+        const files = [...new Set(attemptEdits.map((e) => e.split(' ')[1]).filter(Boolean))].join(', ') || 'the code'
+        const v = st.lastVerify!
+        const proof = v.verdict === 'match' ? `The issue's reproduction now prints the expected value${st.expected ? ` (${st.expected})` : ''}.` : `Tests now pass (${v.comparison!.fixed.length} previously failing test(s) fixed, none newly broken).`
+        io.emit({ type: 'status', data: 'Fix verified — finishing' })
+        return result(true, `Fixed by editing ${files}. ${proof}`)
+      }
+    }
 
     if (edit || call.tool === 'revert') {
       if (st.lastVerify?.verdict === 'differs' || st.lastVerify?.comparison?.broken.length) failedVerifies++

@@ -4,6 +4,7 @@ import { useApp } from '../../store'
 import { useSession } from '../../lib/session'
 import { useChat, sendMessage, stopSession, reattach, type Item } from '../../lib/chat'
 import { TaskForm } from './TaskForm'
+import { IssueStrip } from './IssueStrip'
 import { Composer } from './Composer'
 import { AiBubble, UserBubble, ToolCard, TaskCard, ErrorCard, ResultCard, PhaseRow } from './Cards'
 import { Md } from './Md'
@@ -29,12 +30,6 @@ function Empty({ root }: { root: string | null }) {
         {chip(<Bug size={15} />, 'Find likely bugs', () => root && void sendMessage(root, 'Review the code for likely bugs and list them with file and line.'))}
         {chip(<TestTube2 size={15} />, 'Run the tests', () => root && void sendMessage(root, 'Run the test suite and summarise what passes and fails.'))}
       </div>
-      {s.issues.length > 0 && (
-        <div className="mt-4 w-full max-w-[300px] text-left">
-          <div className="text-[10.5px] uppercase tracking-wider text-faint mb-1">Open issues</div>
-          {s.issues.slice(0, 3).map((i) => <button key={i.number} onClick={() => s.set({ picked: i, agentView: 'task' })} className="w-full text-left h-7 px-2 rounded hover:bg-hover text-[12px] text-muted hover:text-ink truncate"><span className="font-mono text-faint mr-1.5">#{i.number}</span>{i.title}</button>)}
-        </div>
-      )}
     </div>
   )
 }
@@ -107,6 +102,7 @@ export function AgentPanel() {
       </div>
       {s.agentView === 'task' ? <div className="flex-1 min-h-0"><TaskForm /></div> : (
         <>
+          <IssueStrip root={root} />
           {chat.items.length === 0 ? <div className="flex-1 min-h-0"><Empty root={root} /></div> : <Transcript items={chat.items} phase={chat.phase} root={root} />}
           {chat.phase === 'running' && root && <WorkingBar root={root} />}
           <Composer running={chat.phase === 'running'} />

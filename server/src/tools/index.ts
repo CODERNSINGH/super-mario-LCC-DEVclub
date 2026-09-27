@@ -35,6 +35,10 @@ const q = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`
 
 const ALIASES: Record<string, string> = { grep: 'search', read: 'read_file', cat: 'read_file', open: 'read_file', edit: 'replace', str_replace: 'replace', edit_lines: 'replace_lines', rewrite_function: 'replace_function', replace_fn: 'replace_function', update_function: 'replace_function', replace_range: 'replace_lines', create_file: 'write_file', write: 'write_file', run: 'bash', shell: 'bash', sh: 'bash', ls: 'bash', done: 'finish' }
 
+/** Dependency manifests, lockfiles and build/test config: an issue fix belongs in source code, never here. */
+const PROTECTED = /(^|\/)(package\.json|package-lock\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb|\.npmrc|\.babelrc(\..*)?|babel\.config\.[a-z]+|jest\.config\.[a-z]+|vitest\.config\.[a-z]+|tsconfig(\..*)?\.json|webpack\.config\.[a-z]+|vite\.config\.[a-z]+|Cargo\.lock|go\.sum|poetry\.lock|Pipfile\.lock|requirements\.txt|pyproject\.toml|setup\.py|pom\.xml|build\.gradle(\.kts)?)$/
+export const isProtectedPath = (p: string): boolean => PROTECTED.test(p)
+
 export const EDIT_TOOLS = ['replace', 'replace_lines', 'replace_function', 'write_file', 'revert']
 
 /** Chat mode is read-only: deny anything that could modify the working tree. */
@@ -100,6 +104,9 @@ export async function execute(root: string, rawCall: ToolCall, opts: { readOnly?
   const call = { ...rawCall, tool: ALIASES[rawCall.tool] ?? rawCall.tool }
   const a = { ...(call.args ?? {}) }
   if (a.path) a.path = cleanPath(a.path)!
+  if (a.path && ['replace', 'replace_lines', 'replace_function', 'write_file'].includes(call.tool) && isProtectedPath(a.path)) {
+    return `ERROR: ${a.path} is a dependency/build-config file and is protected. Fix the bug in the SOURCE code instead; do not change dependencies, lockfiles or build/test configuration. If a test cannot run, read its error output and fix the source file it points to.`
+  }
   if (opts.readOnly && EDIT_TOOLS.includes(call.tool)) return 'ERROR: this is a read-only chat, so files cannot be edited here. Explain the change in words instead, or ask the user to switch to Solve mode.'
   try {
     switch (call.tool) {
