@@ -51,7 +51,7 @@ function guard(user?: AbortSignal, firstMs = 120_000, idleMs = 75_000) {
   return { signal: ac.signal, touch: () => arm(idleMs), done: () => { clearTimeout(t); user?.removeEventListener('abort', onAbort) }, timedOut: () => timedOut }
 }
 
-const TIMEOUT_MSG = 'The model stopped responding (no output for 2 minutes). Check that the provider is reachable and the model is loaded.'
+const TIMEOUT_MSG = 'The model stopped responding (no output for over a minute). Check that the provider is reachable and the model is loaded.'
 
 function bodyFor(cfg: LlmConfig, messages: Message[], tools: unknown[] | undefined, streaming: boolean, temperature = 0.1) {
   return {

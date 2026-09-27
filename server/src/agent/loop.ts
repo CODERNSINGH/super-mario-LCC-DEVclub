@@ -95,7 +95,7 @@ async function prepare(st: SessionState, io: TurnIO): Promise<void> {
   let baselineOut = ''
   if (st.hasTests) {
     io.emit({ type: 'status', data: 'Running baseline tests' })
-    const b = await runShell(st.root, `CI=1 ${st.testCmd}`, 120_000)
+    const b = await runShell(st.root, `CI=1 ${st.testCmd}`, 300_000)
     st.baseline = parseTestOutput(b.output, b.code)
     baselineOut = b.output
     io.emit({ type: 'tool', data: { call: { tool: 'baseline', args: { command: st.testCmd } }, out: `exit ${b.code}\n${failureExcerpt(b.output, 1500)}` } })
@@ -139,7 +139,7 @@ async function verify(st: SessionState, io: TurnIO): Promise<string> {
   let verdict: Verdict = 'unknown'
   if (st.hasTests) {
     io.emit({ type: 'status', data: 'Running tests' })
-    const t = await runShell(st.root, `CI=1 ${st.testCmd}`, 90_000)
+    const t = await runShell(st.root, `CI=1 ${st.testCmd}`, 240_000)
     const now = parseTestOutput(t.output, t.code)
     cmp = compareRuns(st.baseline ?? { exit: 0, failing: [], failedCount: 0, passedCount: null, unparsed: false }, now)
     parts.push(describeComparison(cmp, now))
@@ -193,7 +193,7 @@ export async function runTurn(st: SessionState, io: TurnIO, kind: 'work' | 'foll
   const turnStartVersion = st.editVersion
   const answerAllowed = kind !== 'work'
   const tools = st.mode === 'chat' ? READ_ONLY_TOOLS : NATIVE_TOOLS
-  let badFormat = 0, totalBad = 0, bounces = 0
+  let badFormat = 0, totalBad = 0, bounces = 0, stallRetries = 0
   const seen = new Map<string, number>()
   const reads = new Map<string, number>()
   let step = 0
@@ -224,6 +224,13 @@ export async function runTurn(st: SessionState, io: TurnIO, kind: 'work' | 'foll
       }, io.signal, tools, Math.min(0.8, 0.1 + 0.2 * st.unchangedStreak + 0.15 * (attempt - 1)))
     } catch (e) {
       if (io.signal?.aborted) return result(false, 'Stopped by user')
+      // Watchdog: a stalled/timed-out model call restarts THIS step (up to 2 times) instead of ending the run.
+      if (!(e instanceof ToolCallRejected) && /did not respond|stopped responding|stalled|timed out|timeout|ECONNRESET|fetch failed|terminated|socket hang up/i.test((e as Error).message)) {
+        if (++stallRetries > 2) return result(false, `Stopped: the model stalled 3 times in a row (${(e as Error).message.slice(0, 120)}). Check the provider/connection, then send a message to continue.`)
+        io.emit({ type: 'status', data: `Model stalled — restarting this step (${stallRetries}/2)` })
+        step--
+        continue
+      }
       if (!(e instanceof ToolCallRejected)) throw e
       totalBad++
       if (++badFormat >= 4 || totalBad >= 8) return result(false, 'Stopped: the model keeps calling tools that do not exist. Use a stronger model.')
@@ -231,6 +238,7 @@ export async function runTurn(st: SessionState, io: TurnIO, kind: 'work' | 'foll
       messages.push({ role: 'user', content: `That tool does not exist (you tried: ${e.failedGeneration.slice(0, 160)}). Use ONLY these tools: bash, search, read_file${st.mode === 'solve' ? ', replace, replace_lines, replace_function, write_file, revert, think, finish' : ', think'}. To list files use bash with "git ls-files | head -100".` })
       continue
     }
+    stallRetries = 0
     st.inT += r.inputTokens; st.outT += r.outputTokens
     io.emit({ type: 'usage', data: { inputTokens: st.inT, outputTokens: st.outT, steps: step } })
     if (r.visible) io.emit({ type: 'assistant', data: r.visible })

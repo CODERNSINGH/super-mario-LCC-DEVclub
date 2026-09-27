@@ -10,7 +10,7 @@ export interface SessionInit {
   notes?: string
   testCommand?: string
   maxSteps?: number
-  /** Hard wall-clock limit per turn in minutes (default 8, clamped 3-15). */
+  /** Optional whole-run wall-clock limit in minutes. Default: none (per-step watchdog only). */
   timeLimitMin?: number
   /** Test seam: replace the model call. */
   deps?: Partial<SessionState['deps']>
@@ -41,7 +41,8 @@ export class Session {
   constructor(init: SessionInit) {
     this.mode = init.mode
     this.maxSteps = init.maxSteps ?? 30
-    this.timeLimitMs = Math.min(15, Math.max(3, init.timeLimitMin ?? 8)) * 60_000
+    // No whole-run limit by default (0 = none). Stuck steps are restarted individually by the loop's watchdog.
+    this.timeLimitMs = init.timeLimitMin && init.timeLimitMin > 0 ? Math.min(120, init.timeLimitMin) * 60_000 : 0
     this.state = newState({ mode: init.mode, root: init.root, llm: init.llm, issue: init.issue, notes: init.notes, testCommand: init.testCommand, deps: init.deps })
   }
 
@@ -96,8 +97,8 @@ export class Session {
     const ac = new AbortController()
     this.ac = ac
     // Never run forever: user Stop OR the wall-clock deadline aborts the model call and the turn.
-    const deadline = AbortSignal.timeout(this.timeLimitMs)
-    const signal = AbortSignal.any([ac.signal, deadline])
+    const deadline = this.timeLimitMs ? AbortSignal.timeout(this.timeLimitMs) : new AbortController().signal
+    const signal = this.timeLimitMs ? AbortSignal.any([ac.signal, deadline]) : ac.signal
     this.emit({ type: 'phase', data: 'running' })
     this.current = (async () => {
       try {

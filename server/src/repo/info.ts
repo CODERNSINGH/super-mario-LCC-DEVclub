@@ -71,7 +71,7 @@ export async function installDeps(root: string): Promise<string | null> {
       : has('yarn.lock') ? 'yarn install --frozen-lockfile'
       : has('package-lock.json') ? 'npm ci --no-audit --no-fund'
       : 'npm install --no-package-lock --no-audit --no-fund'
-    const r = await runShell(root, cmd, 300_000)
+    const r = await runShell(root, cmd, 480_000)
     return `$ ${cmd}\nexit ${r.code}\n${r.output.slice(-600)}`
   }
   return null
