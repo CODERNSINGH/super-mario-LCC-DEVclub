@@ -3,7 +3,7 @@ import { trackedFiles, detectTestCommand } from './repo/info.js'
 
 /** Approximate public list prices, USD per 1M tokens [input, output]. Local models are free. */
 const PRICES: Record<string, [number, number]> = {
-  'deepseek-chat': [0.27, 1.1], 'deepseek-reasoner': [0.55, 2.19],
+  'deepseek-v4-pro': [1.32, 3.96], 'deepseek-flash': [0.3, 1.2], 'deepseek-chat': [0.27, 1.1], 'deepseek-reasoner': [0.55, 2.19],
   'qwen3-coder-plus': [1.0, 5.0], 'qwen3-coder-flash': [0.3, 1.5], 'qwen3-max': [1.2, 6.0], 'qwen-plus': [0.4, 1.2], 'qwen-max': [1.6, 6.4],
   'gpt-4.1': [2, 8], 'gpt-4.1-mini': [0.4, 1.6],
   'claude-sonnet-5': [3, 15], 'claude-haiku-4-5-20251001': [1, 5],

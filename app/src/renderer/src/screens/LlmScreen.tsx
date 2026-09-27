@@ -7,7 +7,7 @@ import { BrandTile } from '../ui/brand'
 import { isSmallModel } from '../lib/api'
 
 /** Live model list minus non-chat models; curated defaults come first. Falls back to the curated list. */
-const NON_CHAT = /whisper|tts|guard|embed|transcri|orpheus|playai|moderation|safeguard/i
+const NON_CHAT = /whisper|tts|guard|embed|transcri|orpheus|playai|moderation|safeguard|image|video|\bwan|-vl\b|omni|asr|rerank|ocr|realtime|livetranslate|deep-research|-mt-/i
 function usable(live: string[] | undefined, curated: string[]): string[] {
   if (!live?.length) return curated
   const chat = live.filter((m) => !NON_CHAT.test(m))
@@ -30,18 +30,21 @@ export function LlmScreen() {
   const [model, setModel] = useState('')
   const [status, setStatus] = useState<{ ok: boolean; message: string; models?: string[] } | null>(null)
   const [testing, setTesting] = useState(false)
+  const [endpoint, setEndpoint] = useState('') // optional custom base URL (advanced)
 
   useEffect(() => { void window.sakai.llm.providers().then((l) => setProviders([...l].sort((a, b) => ORDER.indexOf(a.id) - ORDER.indexOf(b.id)))) }, [])
 
-  async function test(p: P, k: string) {
+  async function test(p: P, k: string, ep = endpoint) {
     setTesting(true)
-    const r = await window.sakai.llm.test(p.id, k)
+    const r = await window.sakai.llm.test(p.id, k, ep.trim() || undefined)
     setStatus(r); setTesting(false)
     if (r.ok) { const list = usable(r.models, p.models); setModel((m) => (list.includes(m) ? m : list[0] ?? m)) }
   }
 
   async function choose(p: P) {
     setSel(p); setKey(''); setStatus(null); setModel(p.models[0] ?? '')
+    const savedEp = (() => { try { return localStorage.getItem(`sakai.endpoint.${p.id}`) ?? '' } catch { return '' } })()
+    setEndpoint(savedEp)
     if (!p.needsKey) return void (await test(p, ''))
     const saved = await window.sakai.llm.key(p.id) // Keychain or dev .env
     if (saved) { setKey(saved); await test(p, saved) }
@@ -49,7 +52,9 @@ export function LlmScreen() {
 
   async function finish() {
     if (sel?.needsKey && key) await window.sakai.secret.set(`llm:${sel.id}`, key)
-    set({ llm: { provider: sel!.id, model }, step: 'workspace' })
+    const ep = endpoint.trim()
+    try { if (ep) localStorage.setItem(`sakai.endpoint.${sel!.id}`, ep); else localStorage.removeItem(`sakai.endpoint.${sel!.id}`) } catch { /* storage unavailable */ }
+    set({ llm: { provider: sel!.id, model, baseUrl: ep || undefined }, step: 'workspace' })
   }
 
   const options = usable(status?.models, sel?.models ?? [])
@@ -84,8 +89,18 @@ export function LlmScreen() {
           {status?.ok && isSmallModel(model) && <p className="text-xs text-sakai flex gap-1.5"><TriangleAlert size={13} className="shrink-0 mt-0.5" />{model} is very small. Agents need a 7B+ coder model (e.g. qwen2.5-coder:7b) or a hosted model to work reliably.</p>}
           {status?.ok && (
             <select value={model} onChange={(e) => setModel(e.target.value)} className="w-full h-9 px-2 rounded-md bg-bg border border-line text-xs text-ink outline-none focus:border-sakai">
-              {options.map((m) => <option key={m}>{m}</option>)}
+              {(options.includes(model) ? options : [model, ...options]).map((m) => <option key={m}>{m}</option>)}
             </select>
+          )}
+          {status?.ok && (
+            <input value={model} onChange={(e) => setModel(e.target.value)} spellCheck={false} placeholder="…or type any model ID" className="w-full h-8 px-2 rounded-md bg-bg border border-line text-[11px] font-mono text-ink outline-none focus:border-sakai" />
+          )}
+          {sel.needsKey && (
+            <details className="text-[11px] text-muted">
+              <summary className="cursor-pointer select-none hover:text-fg">Custom endpoint (advanced)</summary>
+              <input value={endpoint} onChange={(e) => setEndpoint(e.target.value)} spellCheck={false} placeholder={sel.baseUrl} className="mt-1.5 w-full h-8 px-2 rounded-md bg-bg border border-line text-[11px] font-mono text-ink outline-none focus:border-sakai" />
+              <p className="mt-1 text-faint">Leave empty for the default. Use this if your provider gave you a workspace-specific URL (e.g. Alibaba Cloud Model Studio). Then press Test.</p>
+            </details>
           )}
         </div>
       )}
