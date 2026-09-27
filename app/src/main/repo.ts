@@ -14,15 +14,14 @@ export function registerRepoIpc(getSecret: (k: string) => string | null): void {
 
   // Clones (or reuses) the repo using the user's OAuth token; streams logs to the renderer.
   ipcMain.handle('repo:clone', async (e, repo: string) => {
-    const token = getSecret('github')
-    if (!token) throw new Error('Not signed in')
+    const token = getSecret('github') // optional: public repos clone without signing in
     const root = join(app.getPath('home'), 'Sakai')
     mkdirSync(root, { recursive: true })
     const win = BrowserWindow.fromWebContents(e.sender)
     const log = (line: string) => win?.webContents.send('repo:log', line)
     if ((await git(root, ['--version'])).code !== 0) throw new Error(GIT_MISSING_MESSAGE.replace('try again', 'press Retry clone'))
     const url = `https://github.com/${repo}.git`
-    const auth = ['-c', `http.extraheader=Authorization: Basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`]
+    const auth = token ? ['-c', `http.extraheader=Authorization: Basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`] : []
 
     let dest = join(root, repo.replace('/', '__'))
     if (existsSync(dest)) {
@@ -59,7 +58,7 @@ export function registerRepoIpc(getSecret: (k: string) => string | null): void {
 
     log(`$ git clone ${url} ${dest}`)
     const r = await git(root, [...auth, 'clone', '--progress', url, dest], log)
-    if (r.code !== 0) throw new Error(`git clone failed (exit ${r.code}). Check the repository exists and your GitHub account has access.`)
+    if (r.code !== 0) throw new Error(`git clone failed (exit ${r.code}). Check the repository exists and is public (or sign in with GitHub for private repos).`)
     return dest
   })
 }

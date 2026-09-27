@@ -51,10 +51,21 @@ export async function testProvider(id: string, apiKey: string, baseUrl?: string)
   }
 }
 
+/** Provider ids that AI_PROVIDER may name, and the model used when AI_MODEL is not set. */
+const EVAL_DEFAULT_MODEL: Record<string, string> = { deepseek: 'deepseek-v4-pro', qwen: 'qwen3.8-max', 'qwen-cn': 'qwen3.8-max', groq: 'openai/gpt-oss-120b', openai: 'gpt-4.1', anthropic: 'claude-sonnet-5' }
+
+/** Evaluation/headless mode: credentials come ONLY from the environment (AI_API_KEY), never from files. */
+export function evalConfig(): { provider: string; model: string; baseUrl?: string } | null {
+  if (!process.env.AI_API_KEY) return null
+  const provider = (process.env.AI_PROVIDER || 'deepseek').toLowerCase()
+  return { provider, model: process.env.AI_MODEL || EVAL_DEFAULT_MODEL[provider] || 'deepseek-v4-pro', baseUrl: process.env.AI_BASE_URL || undefined }
+}
+
 const ENV_KEYS: Record<string, string> = { groq: 'GROQ_API_KEY', deepseek: 'DEEPSEEK_API_KEY', qwen: 'DASHSCOPE_API_KEY', 'qwen-cn': 'DASHSCOPE_API_KEY', openai: 'OPENAI_API_KEY', anthropic: 'ANTHROPIC_API_KEY' }
 
 export function registerLlmIpc(): void {
-  ipcMain.handle('llm:key', (_e, id: string) => getSecret(`llm:${id}`) || (ENV_KEYS[id] ? process.env[ENV_KEYS[id]] ?? '' : ''))
+  ipcMain.handle('llm:evalConfig', () => evalConfig())
+  ipcMain.handle('llm:key', (_e, id: string) => (process.env.AI_API_KEY && evalConfig()?.provider === id ? process.env.AI_API_KEY : '') || getSecret(`llm:${id}`) || (ENV_KEYS[id] ? process.env[ENV_KEYS[id]] ?? '' : ''))
   ipcMain.handle('llm:envKey', (_e, id: string) => (ENV_KEYS[id] ? process.env[ENV_KEYS[id]] ?? '' : ''))
   ipcMain.handle('llm:providers', () =>
     PROVIDERS.map((p) => (p.id === 'ollama' && process.env.OLLAMA_HOST ? { ...p, baseUrl: process.env.OLLAMA_HOST } : p.id === 'lmstudio' && process.env.LMSTUDIO_HOST ? { ...p, baseUrl: process.env.LMSTUDIO_HOST } : p)))

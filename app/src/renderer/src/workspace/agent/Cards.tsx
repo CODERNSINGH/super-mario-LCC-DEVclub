@@ -187,9 +187,9 @@ export function ResultCard({ finished, summary }: { finished: boolean; summary: 
         {files.length === 0 && !msg && <p className="text-[12px] text-muted">No files were changed.</p>}
         <div className="flex flex-wrap gap-2 items-center">
           {pr ? <a href={pr.url} target="_blank" className="text-sakai text-[12.5px] underline underline-offset-2">Open pull request #{pr.number}</a>
-            : mode === 'github' ? <Button className="h-8 text-[12px]" disabled={busy || !files.length} onClick={createPr}><GitPullRequest size={13} className="inline -mt-0.5 mr-1.5" />{busy ? 'Opening PR…' : 'Create pull request'}</Button>
+            : mode === 'github' && user ? <Button className="h-8 text-[12px]" disabled={busy || !files.length} onClick={createPr}><GitPullRequest size={13} className="inline -mt-0.5 mr-1.5" />{busy ? 'Opening PR…' : 'Create pull request'}</Button>
             : <Button className="h-8 text-[12px]" disabled={busy || !files.length} onClick={commitLocal}><GitCommitHorizontal size={13} className="inline -mt-0.5 mr-1.5" />{busy ? 'Committing…' : 'Commit locally'}</Button>}
-          {mode === 'github' && !pr && <Button variant="ghost" className="h-8 text-[12px]" disabled={busy || !files.length} onClick={commitLocal}>Commit only</Button>}
+          {mode === 'github' && user && !pr && <Button variant="ghost" className="h-8 text-[12px]" disabled={busy || !files.length} onClick={commitLocal}>Commit only</Button>}
           <Button variant="quiet" className="h-8 text-[12px]" disabled={!files.length} onClick={discard}><Trash2 size={13} className="inline -mt-0.5 mr-1" />Discard</Button>
         </div>
         {msg && <p className="text-[12px] text-muted whitespace-pre-wrap">{msg}</p>}

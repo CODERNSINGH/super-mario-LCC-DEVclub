@@ -33,9 +33,7 @@ export function registerIpc(): void {
   ipcMain.handle('github:token', () => getSecret('github'))
   ipcMain.handle('github:signout', () => { cancelDeviceFlow(); deleteSecret('github'); deleteSecret('github_user') })
   ipcMain.handle('github:issues', (_e, repo: string) => {
-    const t = getSecret('github')
-    if (!t) throw new Error('Not signed in')
-    return listIssues(t, repo)
+    return listIssues(getSecret('github'), repo) // works anonymously for public repos
   })
   ipcMain.handle('secret:set', (_e, k: string, v: string) => setSecret(k, v))
   ipcMain.handle('secret:get', (_e, k: string) => getSecret(k))

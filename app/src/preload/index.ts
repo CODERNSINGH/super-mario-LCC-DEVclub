@@ -29,6 +29,7 @@ const api = {
   llm: {
     providers: () => invoke<{ id: string; name: string; kind: string; baseUrl: string; needsKey: boolean; models: string[]; note?: string }[]>('llm:providers'),
     key: (id: string) => invoke<string>('llm:key', id),
+    evalConfig: () => invoke<{ provider: string; model: string; baseUrl?: string } | null>('llm:evalConfig'),
     envKey: (id: string) => invoke<string>('llm:envKey', id),
     test: (id: string, key: string, baseUrl?: string) => invoke<{ ok: boolean; message: string; models?: string[] }>('llm:test', id, key, baseUrl),
   },

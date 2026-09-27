@@ -130,11 +130,12 @@ export async function fetchUser(token: string): Promise<GhUser> {
   throw new Error(r.state === 'offline' ? OFFLINE : 'GitHub rejected the sign-in token. Please connect again.')
 }
 
-export async function listIssues(token: string, repo: string) {
+export async function listIssues(token: string | null, repo: string) {
   const res = await ghFetch(`https://api.github.com/repos/${repo}/issues?state=open&per_page=100`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'User-Agent': 'Sakai' },
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), Accept: 'application/vnd.github+json', 'User-Agent': 'Sakai' },
   })
-  if (res.status === 404) throw new Error(`Repository ${repo} not found, or your GitHub account has no access to it.`)
+  if (res.status === 403 && !token) throw new Error('GitHub rate limit reached for anonymous requests. Sign in with GitHub, or try again later.')
+  if (res.status === 404) throw new Error(`Repository ${repo} not found${token ? ', or your GitHub account has no access to it' : ' (private repositories need a GitHub sign-in)'}.`)
   if (res.status === 401) throw new Error('GitHub rejected the sign-in token. Please connect again.')
   if (!res.ok) throw new Error(`Could not list issues (${res.status})`)
   const items = (await res.json()) as Array<{ number: number; title: string; body: string | null; labels: { name: string }[]; pull_request?: unknown }>

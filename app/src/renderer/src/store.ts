@@ -27,6 +27,8 @@ interface State {
   repo: string | null
   user: GhUser | null
   llm: LlmChoice | null
+  /** True while the model came from the AI_API_KEY environment (evaluation mode): the model step is skipped once. */
+  envAuto: boolean
   localPath: string | null
   set: (p: Partial<State>) => void
 }
@@ -35,6 +37,6 @@ export const useApp = create<State>((set) => ({
   profile: initProfile(), tipsOn: ls('sakai.tips') !== 'off',
   setProfile: (profile) => { lsSet('sakai.profile', profile); set({ profile }) },
   setTipsOn: (b) => { lsSet('sakai.tips', b ? 'on' : 'off'); set({ tipsOn: b }) },
-  step: 'repo', mode: 'github', repoInput: '', repo: null, user: null, llm: null, localPath: null,
+  step: 'repo', mode: 'github', repoInput: '', repo: null, user: null, llm: null, envAuto: false, localPath: null,
   set: (p) => set(p),
 }))

@@ -83,7 +83,7 @@ export function GithubScreen() {
         <Button className="flex-1" disabled={!user} onClick={() => set({ step: 'llm', mode: 'github' })}>Continue</Button>
       </div>
       <div className="mt-3 text-center">
-        <button className="text-[12px] text-muted hover:text-ink underline underline-offset-4" onClick={() => set({ mode: 'local', repo: null, localPath: null, step: 'llm' })}>Skip for now — I’ll use a local folder</button>
+        <button className="text-[12px] text-muted hover:text-ink underline underline-offset-4" onClick={() => (repo ? set({ mode: 'github', step: 'llm' }) : set({ mode: 'local', repo: null, localPath: null, step: 'llm' }))}>{repo ? 'Continue without signing in (public repositories only)' : 'Skip for now — I’ll use a local folder'}</button>
       </div>
     </Onboard>
   )
