@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/black_bg_logo.jpeg">
-    <img src="assets/white_bg_logo.jpeg" alt="Sakai IDE" width="180">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo-dark.png">
+    <img src="assets/logo-light.png" alt="Sakai IDE" width="200">
   </picture>
 </p>
 
