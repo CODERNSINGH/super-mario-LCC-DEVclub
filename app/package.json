@@ -70,7 +70,8 @@
       ],
       "hardenedRuntime": false,
       "icon": "build/icon.icns",
-      "identity": null
+      "identity": "-",
+      "gatekeeperAssess": false
     },
     "dmg": {
       "title": "Sakai IDE",

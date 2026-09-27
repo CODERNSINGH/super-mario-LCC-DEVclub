@@ -18,8 +18,13 @@ Issue ─▶ understand ─▶ localize (search/read) ─▶ reproduce ─▶ fi
 - **Auth**: GitHub OAuth Device Flow. Tokens are stored encrypted in the macOS Keychain and used for clone, push and PR creation.
 
 ## Install (end users)
-1. Download `Sakai.dmg`, drag Sakai to Applications.
-2. Open it, paste a repository URL, click **Connect GitHub**, then pick a model and paste your own API key (or choose Ollama / LM Studio — free, no key). Model usage is billed to your own provider account; Sakai shows a cost estimate before each run.
+1. Open `Sakai-IDE-<version>-arm64.dmg` and drag **Sakai IDE** into **Applications** (Apple Silicon Macs: M1 and newer).
+   - **First launch only:** the build is not yet notarized by Apple, so macOS may say it "cannot be opened" or "cannot verify the developer". Do one of these:
+     - **Right-click** Sakai IDE in Applications → **Open** → **Open**; or
+     - **System Settings → Privacy & Security** → scroll down → **Open Anyway**; or
+     - In Terminal: `xattr -cr "/Applications/Sakai IDE.app"` and open it again.
+   - After that it opens normally (search "Sakai IDE" in Spotlight).
+2. Open it, pick who you are, paste a repository URL, click **Connect GitHub**, then pick a model and paste your own API key (or choose Ollama / LM Studio — free, no key). Model usage is billed to your own provider account; Sakai shows a cost estimate before each run.
 
 There is nothing else to configure: no `.env`, no OAuth app. GitHub tokens and API keys are stored encrypted in your macOS Keychain.
 
