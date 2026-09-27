@@ -7,7 +7,7 @@
 
 <h1 align="center">Sakai IDE</h1>
 
-<p align="center"><b>Fix GitHub issues, autonomously.</b><br>
+<p align="center"><b>Fix GitHub issues, autonomously — with the model <i>you</i> choose.</b><br>
 A VS Code-style desktop IDE wrapped around an autonomous coding agent that reproduces the bug, edits the code, verifies against your tests, and hands you a reviewed diff.</p>
 
 <p align="center">
@@ -17,6 +17,25 @@ A VS Code-style desktop IDE wrapped around an autonomous coding agent that repro
   <img alt="Node 20+" src="https://img.shields.io/badge/Node-%E2%89%A5%2020-339933?logo=nodedotjs&logoColor=white">
   <img alt="Bring your own key" src="https://img.shields.io/badge/models-bring%20your%20own%20key-BC002D">
 </p>
+
+<br>
+
+<p align="center">
+  <a href="https://github.com/CODERNSINGH/super-mario-LCC-DEVclub/releases/latest">
+    <img alt="Download Sakai IDE for macOS" src="https://img.shields.io/badge/%E2%AC%87%20%20DOWNLOAD%20SAKAI%20IDE%20FOR%20macOS-BC002D?style=for-the-badge&logo=apple&logoColor=white" height="72">
+  </a>
+</p>
+<p align="center"><sub>Apple Silicon (M1 and newer) &nbsp;·&nbsp; free &nbsp;·&nbsp; <a href="#b-download-the-app-macos-apple-silicon">one-line installer &amp; help</a> &nbsp;·&nbsp; or <a href="#a-evaluator--clone-and-run-makefile">run from source</a> with <code>make setup &amp;&amp; make run</code></sub></p>
+
+<br>
+
+### Pick your model — DeepSeek, Qwen, Groq, OpenAI, Anthropic, Ollama or LM Studio
+
+<p align="center">
+  <img src="docs/screenshots/models.jpg" alt="Sakai IDE model picker: choose DeepSeek, Qwen, Groq, OpenAI, Anthropic, Ollama or LM Studio, test the key, select the exact model" width="900">
+</p>
+
+Choose the provider, paste your key, press **Test**, and pick the exact model from the live list (or type any model ID). Every request goes **straight to the provider's own API** — no gateway, no proxy — and your key stays in the macOS Keychain. Local models via Ollama and LM Studio are free. (For the hackathon evaluators, `AI_API_KEY` connects the model automatically — see the quickstart below.)
 
 <p align="center">
   <img src="docs/screenshots/diff.jpg" alt="Sakai IDE: side-by-side green/red diff, one-click Solve, Create pull request" width="900">
