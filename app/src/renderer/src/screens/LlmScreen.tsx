@@ -46,7 +46,7 @@ export function LlmScreen() {
     const savedEp = (() => { try { return localStorage.getItem(`sakai.endpoint.${p.id}`) ?? '' } catch { return '' } })()
     setEndpoint(savedEp)
     if (!p.needsKey) return void (await test(p, ''))
-    const saved = await window.sakai.llm.key(p.id) // Keychain or dev .env
+    const saved = await window.sakai.llm.key(p.id) // saved on this Mac or dev .env
     if (saved) { setKey(saved); await test(p, saved) }
   }
 
@@ -60,7 +60,7 @@ export function LlmScreen() {
   const options = usable(status?.models, sel?.models ?? [])
 
   return (
-    <Onboard step="llm" title="Bring your own model" subtitle="Sakai runs on the model you choose. Keys stay in your macOS Keychain and go only to that provider.">
+    <Onboard step="llm" title="Bring your own model" subtitle="Sakai runs on the model you choose. Your key stays on this Mac and goes only to that provider.">
       <div className="grid grid-cols-2 gap-2">
         {providers.map((p) => (
           <button key={p.id} onClick={() => choose(p)} className={`flex items-center gap-3 p-2.5 rounded-xl border text-left transition-all ${sel?.id === p.id ? 'border-sakai bg-sakai/10' : 'border-line bg-panel/80 hover:border-line2 hover:bg-raised'}`}>

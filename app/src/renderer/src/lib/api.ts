@@ -18,7 +18,7 @@ export async function post<T>(path: string, body: unknown, session = false): Pro
 
 export interface LlmConfig { baseUrl: string; apiKey?: string; model: string; kind: 'openai' | 'anthropic' | 'ollama'; native?: boolean }
 
-/** Resolves the user's chosen provider into a concrete server config (key from Keychain or .env). */
+/** Resolves the user's chosen provider into a concrete server config (key saved on this Mac, or from .env in dev). */
 export async function resolveLlm(): Promise<LlmConfig> {
   const choice = useApp.getState().llm
   if (!choice) throw new Error('No model selected')

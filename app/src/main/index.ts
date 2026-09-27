@@ -42,6 +42,9 @@ function createWindow(): void {
 
 loadEnv()
 
+// Never touch the macOS Keychain (Chromium would otherwise ask to use "Sakai IDE Safe Storage").
+app.commandLine.appendSwitch('use-mock-keychain')
+
 app.whenReady().then(async () => {
   // Packaged builds take the icon from build/icon.icns; in dev, set the Dock icon explicitly.
   if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(nativeImage.createFromPath(join(__dirname, '../../build/icon.png')))

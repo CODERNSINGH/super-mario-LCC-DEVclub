@@ -12,4 +12,4 @@ Sakai IDE is an autonomous issue-fixing harness that solves this on both sides:
 
 **Result:** the same fix, but the human ends up understanding it. The AI does the typing; people keep the thinking.
 
-**Also:** bring-your-own-key with direct provider APIs (no gateway), a local-first design (server on 127.0.0.1, keys in the macOS Keychain), works without a GitHub login, and a standard `make setup` / `make run` / `make solve` interface for evaluation.
+**Also:** bring-your-own-key with direct provider APIs (no gateway), a local-first design (server on 127.0.0.1, keys stored only on your Mac), works without a GitHub login, and a standard `make setup` / `make run` / `make solve` interface for evaluation.

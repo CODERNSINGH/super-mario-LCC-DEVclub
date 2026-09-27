@@ -64,7 +64,7 @@ Sakai IDE fixes that from both sides:
   <img src="docs/screenshots/models.jpg" alt="Sakai IDE model picker: choose DeepSeek, Qwen, Groq, OpenAI, Anthropic, Ollama or LM Studio, test the key, select the exact model" width="900">
 </p>
 
-Choose the provider, paste your key, press **Test**, and pick the exact model from the live list (or type any model ID). Every request goes **straight to the provider's own API** — no gateway, no proxy — and your key stays in the macOS Keychain. Local models via Ollama and LM Studio are free. (For the hackathon evaluators, `AI_API_KEY` connects the model automatically — see the quickstart below.)
+Choose the provider, paste your key, press **Test**, and pick the exact model from the live list (or type any model ID). Every request goes **straight to the provider's own API** — no gateway, no proxy — and your key stays on your Mac. Local models via Ollama and LM Studio are free. (For the hackathon evaluators, `AI_API_KEY` connects the model automatically — see the quickstart below.)
 
 <p align="center">
   <img src="docs/screenshots/diff.jpg" alt="Sakai IDE: side-by-side green/red diff, one-click Solve, Create pull request" width="900">
@@ -306,7 +306,7 @@ Direct provider APIs only, no gateway in between. Text-only models.
 | OpenAI / Anthropic | `api.openai.com` / `api.anthropic.com` |
 | Ollama / LM Studio | Local (`localhost:11434` / `localhost:1234`), free |
 
-You pay your provider directly; Sakai shows an estimate before each run. Keys are stored in the macOS Keychain (app) and never committed.
+You pay your provider directly; Sakai shows an estimate before each run. Keys are stored locally on your Mac (in the app's private data folder) and never committed.
 
 ### Also in the IDE
 
@@ -344,7 +344,7 @@ Three parts:
 | Files | All file access is confined to the repository root (path-traversal rejected) |
 | Command guard | No dependency changes, no git state changes (commit / push / reset / clean / stash / rebase), no `sudo`, no destructive or `curl \| sh` commands |
 | Protected files | `package.json`, lockfiles and build config cannot be edited by the agent |
-| Secrets | API keys and GitHub token live in the macOS Keychain (app) or the environment (`make`); never committed |
+| Secrets | API keys and GitHub token stay on your Mac (private app data folder, owner-only file) or come from the environment (`make`); never committed |
 | Data flow | Your code goes only to the model provider you chose; no gateway or proxy |
 | Renderer | `contextIsolation` on, `nodeIntegration` off, whitelisted IPC only |
 | Runaway control | No whole-run time limit, but hang guards: a command runs up to 8 min, a silent model 5 min (stalled step is restarted automatically), step budget 60 (adjustable) |
@@ -393,7 +393,7 @@ Test repository: [Keshavr57/Bugy-Calcu](https://github.com/Keshavr57/Bugy-Calcu)
 
 **Where does my code go?** Only to the model provider you selected (or nowhere, with a local model). There is no Sakai server or gateway.
 
-**Where are my keys stored?** In the macOS Keychain (app), or read from your environment (`make`). Never in the repo.
+**Where are my keys stored?** On your Mac only: in the app's private data folder (owner-only permissions), or read from your environment (`make`). Never in the repo, and no Keychain prompt.
 
 **Does it change my dependencies or git history?** No. The command guard blocks dependency changes and git state changes; commits happen only when you click Commit or Create PR.
 

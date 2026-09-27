@@ -87,7 +87,7 @@ function SettingsTab() {
       {row('Learning pop-ups', tipsOn ? 'On — short tips while Sakai works.' : 'Off', <Button variant="ghost" className="h-7 text-xs" onClick={() => setTipsOn(!tipsOn)}>{tipsOn ? 'Turn off' : 'Turn on'}</Button>)}
       {row('Default step limit', String(s.stepLimit))}
       {row('Layout', 'Panel sizes are saved automatically.', <Button variant="ghost" className="h-7 text-xs" onClick={() => { try { localStorage.removeItem('sakai.layout') } catch { /* ignore */ } s.set({ sideW: 264, agentW: 400, panelH: 220 }) }}>Reset</Button>)}
-      <p className="mt-6 text-[12px] text-muted leading-relaxed">API keys and your GitHub token are stored encrypted in the macOS Keychain. Model usage is billed by your provider.</p>
+      <p className="mt-6 text-[12px] text-muted leading-relaxed">API keys and your GitHub token are stored only on this Mac, in the app’s private data folder. Model usage is billed by your provider.</p>
     </div></div>
   )
 }
