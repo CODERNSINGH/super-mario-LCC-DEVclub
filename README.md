@@ -29,6 +29,30 @@ A VS Code-style desktop IDE wrapped around an autonomous coding agent that repro
 
 <br>
 
+## What makes Sakai IDE different
+
+> ### The AI does the typing. **You keep the understanding.**
+> Sakai IDE turns the minutes you would spend staring at a spinner into minutes spent **learning what the AI is doing and why** — whether you are a student, a non-technical "vibe coder", or a professional developer.
+
+Every AI coding tool makes the same trade: it writes the code, and you understand a little less. Students copy answers without learning the logic. Vibe coders ship code that works but is quietly insecure. Developers lose track of what changed and why. And everyone waits.
+
+Sakai IDE fixes that from both sides:
+
+| | What it does | Why it matters |
+|---|---|---|
+| **1. It teaches while it works** | Pick a profile — **Student**, **SWE** or **Vibe coder**. While the agent runs, short pop-ups (with a mascot that changes per profile) share bite-size fundamentals, quiz cards, or pro tips, then **fade on their own** — zero friction. | Wait time becomes learning time. |
+| **2. It keeps you in the loop** | Live streaming chat you can steer mid-run, and every change shown **side by side — green added, red removed** — plus the root cause in plain language. | You always know what changed, and can build on it. |
+| **3. It explains the fix for *you*** | After a fix: **students** get a *"what went wrong?"* multiple-choice question with the reasoning; **vibe coders** get a plain-words explanation and a list of hidden weak spots (security holes, missing checks, fragile assumptions); **developers** get crisp root-cause reasoning. | Same fix, three depths of understanding. |
+| **4. It really fixes the issue** | The harness installs dependencies, runs your tests, reproduces the bug, edits with tools, **re-verifies after every edit against a baseline**, and finishes only when nothing regressed. Works with any text-only model — DeepSeek, Qwen, Groq, or local Ollama. | A reliable engineer, not a chatbot that emits code. |
+
+**Who gets what**
+
+| Student | Vibe coder | SWE |
+|---|---|---|
+| Practise the logic instead of just reading answers: fundamentals and quizzes while the AI works, a "what went wrong?" question after. | Not lessons — protection: basic concepts in plain words and a clear list of the risks hiding in "working" code. | Formal, crisp reasoning, no fluff — and the time back to do real work while the agent runs. |
+
+<br>
+
 ### Pick your model — DeepSeek, Qwen, Groq, OpenAI, Anthropic, Ollama or LM Studio
 
 <p align="center">
