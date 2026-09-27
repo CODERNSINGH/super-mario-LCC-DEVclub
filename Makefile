@@ -21,7 +21,7 @@ help: ## Show this help
 	@echo; echo "Evaluator flow:  export AI_API_KEY=\"<key>\"  &&  make setup  &&  make run"
 
 check-tools:
-	@command -v node >/dev/null 2>&1 || { echo "✗ Node.js $(NODE_MIN)+ is required (https://nodejs.org)"; exit 1; }
+	@command -v node >/dev/null 2>&1 || { echo "✗ Node.js $(NODE_MIN)+ is required. Install it with:  brew install node   (or https://nodejs.org)"; exit 1; }
 	@command -v npm  >/dev/null 2>&1 || { echo "✗ npm is required"; exit 1; }
 	@command -v git  >/dev/null 2>&1 || { echo "✗ git is required (macOS: xcode-select --install)"; exit 1; }
 	@node -e 'process.exit(+process.versions.node.split(".")[0] >= $(NODE_MIN) ? 0 : 1)' || { echo "✗ Node.js $(NODE_MIN)+ required, found $$(node -v)"; exit 1; }
@@ -33,13 +33,17 @@ setup: check-tools ## Install dependencies and build the harness
 	@node node_modules/electron/install.js   # make sure the Electron binary is present
 	@cd app && (npx electron-rebuild -f -w node-pty >/dev/null 2>&1 || echo "  (node-pty rebuild skipped — the integrated terminal may be unavailable)")
 	npm run build -w server
+	@echo "Building the desktop app…"
+	npm run build -w app
 	@echo "✓ Setup complete. Next:  export AI_API_KEY=\"<key>\"  &&  make run"
 
-run: ## Launch Sakai IDE (evaluation mode: model auto-connected from AI_API_KEY)
+run: ## Launch Sakai IDE directly (no installer, no security prompt); model auto-connected from AI_API_KEY
 	@test -d node_modules || { echo "✗ Dependencies missing — run: make setup"; exit 1; }
 	@if [ -z "$$AI_API_KEY" ]; then echo "! AI_API_KEY is not set — the app will ask you to connect a model."; else echo "✓ AI_API_KEY detected (provider: $${AI_PROVIDER:-auto-detect}, model: $${AI_MODEL:-default})"; fi
 	@echo "Starting Sakai IDE…"
-	AI_API_KEY="$(AI_API_KEY)" AI_PROVIDER="$(AI_PROVIDER)" AI_MODEL="$(AI_MODEL)" AI_BASE_URL="$(AI_BASE_URL)" npm run dev
+	@test -f app/out/main/index.js || { echo "Building the desktop app first…"; npm run build -w app; }
+	npm run build -w server
+	cd app && AI_API_KEY="$(AI_API_KEY)" AI_PROVIDER="$(AI_PROVIDER)" AI_MODEL="$(AI_MODEL)" AI_BASE_URL="$(AI_BASE_URL)" npx electron-vite preview --skipBuild
 
 test: ## Run unit tests and type-checks
 	@test -d node_modules || { echo "✗ Dependencies missing — run: make setup"; exit 1; }

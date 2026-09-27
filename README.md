@@ -29,6 +29,11 @@ A VS Code-style desktop IDE wrapped around an autonomous coding agent that repro
 
 <br>
 
+> **Seeing “Apple could not verify ‘Sakai IDE’ is free of malware”?** That is macOS being cautious about an app that is not yet notarized by Apple (notarization needs a paid Apple Developer account) — it is not a virus warning. You have three ways past it:
+> 1. **Skip it entirely — run from source** (no installer, no prompt, takes ~2 minutes): `git clone https://github.com/CODERNSINGH/super-mario-LCC-DEVclub.git && cd super-mario-LCC-DEVclub && make setup && make run`
+> 2. **One-line installer:** `curl -fsSL https://raw.githubusercontent.com/CODERNSINGH/super-mario-LCC-DEVclub/main/install.sh | bash`
+> 3. **If you already installed the DMG:** System Settings → Privacy & Security → scroll down → **Open Anyway** (or `xattr -cr "/Applications/Sakai IDE.app"`).
+
 ## What makes Sakai IDE different
 
 > ### The AI does the typing. **You keep the understanding.**
