@@ -139,7 +139,7 @@ The provider and model are defined in [`app/src/main/llm.ts`](app/src/main/llm.t
 | Variable | Purpose | Default |
 |---|---|---|
 | `AI_API_KEY` | API key for the chosen provider (**required to solve**) | none |
-| `AI_PROVIDER` | `deepseek` \| `qwen` \| `qwen-cn` \| `groq` \| `openai` \| `anthropic` | `deepseek` |
+| `AI_PROVIDER` | `deepseek` \| `qwen` \| `qwen-cn` \| `groq` \| `openai` \| `anthropic` | **auto-detected from the key** (each provider is asked in parallel; the first that accepts it wins, falling back to `deepseek`). Set it only to force one. |
 | `AI_MODEL` | Model name | `deepseek-v4-pro` (deepseek), `qwen3.8-max` (qwen) |
 | `AI_BASE_URL` | Optional custom endpoint | provider default |
 | `GITHUB_TOKEN` | Optional, for headless private repos and PRs | none |
@@ -174,7 +174,7 @@ Then follow the [first-run guide](#first-run-guide). In the app you choose the m
 | `make setup` says Node is too old / missing | Install Node 20+ (for example `brew install node` or [nodejs.org](https://nodejs.org)) |
 | `make setup` says git is missing | `xcode-select --install` |
 | `make run` opens the app but the model is not connected | Check `echo $AI_API_KEY` in the same terminal; export it again and re-run |
-| Solve fails with an auth / 401 error | Wrong key for the chosen `AI_PROVIDER`; set both together |
+| Solve fails with an auth / 401 error | The key was rejected by its provider. Check the key; if it belongs to a specific service, force it with `AI_PROVIDER=<name>` |
 | GitHub sign-in code expired | Click **Connect GitHub** again, or choose **Continue without signing in** / **Skip for now** |
 | Private repo will not clone | Sign in to GitHub in the app (or set `GITHUB_TOKEN` for `make solve`) |
 | Apple Intel Mac | The prebuilt DMG is arm64 only; use option A or C (they build for your machine) |

@@ -93,9 +93,20 @@ Options: --steps N  --commit (commit the fix locally on a sakai/* branch)`)
   }
 
   // ── credentials: environment only ───────────────────────────────────────────
-  const provider = (a.provider || process.env.AI_PROVIDER || 'deepseek').toLowerCase()
-  const p = PROVIDERS[provider] ?? fail(`Unknown AI_PROVIDER "${provider}". Use one of: ${Object.keys(PROVIDERS).join(', ')}`)
   const apiKey = process.env.AI_API_KEY
+  let provider = (a.provider || process.env.AI_PROVIDER || '').toLowerCase()
+  if (!provider && apiKey) {
+    // No provider named: find out which service accepts this key (checked in parallel; first by priority wins).
+    const order = ['deepseek', 'qwen', 'qwen-cn', 'groq', 'openai', 'anthropic']
+    const ok = await Promise.all(order.map(async (id) => {
+      const pr = PROVIDERS[id]
+      try { const r = await fetch(`${pr.baseUrl}/models`, { headers: pr.kind === 'anthropic' ? { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' } : { Authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(8000) }); return r.ok } catch { return false }
+    }))
+    provider = order[ok.indexOf(true)] ?? 'deepseek'
+    console.log(dim(`· AI_API_KEY provider: ${ok.includes(true) ? `${provider} (detected)` : 'deepseek (no provider accepted the key; defaulting)'}`))
+  }
+  provider ||= 'deepseek'
+  const p = PROVIDERS[provider] ?? fail(`Unknown AI_PROVIDER "${provider}". Use one of: ${Object.keys(PROVIDERS).join(', ')}`)
   if (!apiKey && provider !== 'ollama') fail('AI_API_KEY is not set.  export AI_API_KEY="<your key>"  and run again.')
   const llm: LlmConfig = { baseUrl: process.env.AI_BASE_URL || p.baseUrl, apiKey, model: a.model || process.env.AI_MODEL || p.model, kind: p.kind, native: p.native }
 

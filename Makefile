@@ -37,7 +37,7 @@ setup: check-tools ## Install dependencies and build the harness
 
 run: ## Launch Sakai IDE (evaluation mode: model auto-connected from AI_API_KEY)
 	@test -d node_modules || { echo "✗ Dependencies missing — run: make setup"; exit 1; }
-	@if [ -z "$$AI_API_KEY" ]; then echo "! AI_API_KEY is not set — the app will ask you to connect a model."; else echo "✓ AI_API_KEY detected (provider: $${AI_PROVIDER:-deepseek}, model: $${AI_MODEL:-default})"; fi
+	@if [ -z "$$AI_API_KEY" ]; then echo "! AI_API_KEY is not set — the app will ask you to connect a model."; else echo "✓ AI_API_KEY detected (provider: $${AI_PROVIDER:-auto-detect}, model: $${AI_MODEL:-default})"; fi
 	@echo "Starting Sakai IDE…"
 	AI_API_KEY="$(AI_API_KEY)" AI_PROVIDER="$(AI_PROVIDER)" AI_MODEL="$(AI_MODEL)" AI_BASE_URL="$(AI_BASE_URL)" npm run dev
 
